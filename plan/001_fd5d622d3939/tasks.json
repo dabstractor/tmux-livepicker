@@ -41,14 +41,14 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "scripts/utils.sh — safe tmux option helpers + is-set probe",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Generic, reusable tmux option primitives: get/set/unset/save-to-orig, plus an is-set probe that distinguishes a genuinely user-set array index from a tmux default (load-bearing for the status-format save/restore trap).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "utils.sh: tmux option helpers + is_set probe",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Two traps drive this module (plan/001_fd5d622d3939/architecture/system_context.md §4). (a) status-format restore must `set-option -gu status-format` (unset→default), NOT literal replay, because show-options returns tmux defaults even though tubular unset them. (b) The session-window-changed hook is array-indexed with -b; save the whole show-hooks line. This module provides the primitives to do both safely.\n2. INPUT: option name (string), optional index (for array options like status-format[n]), optional value.\n3. LOGIC: Implement: `tmux_get_opt name [default]` (show-option -gqv); `tmux_set_opt name value` (set-option -g); `tmux_unset_opt name` (set-option -gu — clears array indices too); `tmux_save_opt orig_name src_name` (read src, write to @livepicker-orig-<src>); `tmux_is_set name` — probe whether an option is genuinely user-set vs default. For the is-set probe use the tubular idiom `tmux show-options -g \"$name\" >/dev/null 2>&1` (succeeds when set even to empty); for array indices, `tmux show-options -g \"status-format[$n]\"` exit code distinguishes set-vs-default in tmux 3.x. Also add `tmux_get_hook hookname` that runs `tmux show-hooks -g <hook>` and returns the FULL multi-line output (every `[N]` index), and `tmux_clear_hook hookname` (`set-hook -gu <hook>` clears all indices). Quote all expansions; addresses use exact-match `=` and window ids `@N` never indices (PRD §13, §16 'Window addressing').\n4. OUTPUT: A sourced script exposing the helpers above. Consumed by state.sh, livepicker.sh (save), restore.sh (restore), preview.sh.\n5. DOCS: Mode A — none (internal helper module, no user-facing surface).",
@@ -65,14 +65,14 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "scripts/state.sh — @livepicker-* state module + saved-state CONTRACT",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Define and implement the livepicker runtime-state accessors and, critically, the SAVED-STATE CONTRACT (the exact @livepicker-orig-* keys) that activate writes and restore reads. This contract is the integration seam between P1.M4 and P1.M5.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "state.sh: state accessors + saved-state contract + clear-all",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S1"
