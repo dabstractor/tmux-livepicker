@@ -383,14 +383,14 @@
               "type": "Task",
               "id": "P1.M5.T1",
               "title": "Restore: unlink preview + select original window",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Remove the linked preview window from the current session (source session keeps it) and re-select the original window.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T1.S1",
                   "title": "restore.sh: unlink preview + select-window to ORIG_WINDOW",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1",
@@ -410,14 +410,14 @@
               "type": "Task",
               "id": "P1.M5.T2",
               "title": "Restore: keep vs cancel client branching",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Implement the single session-switch policy: cancel switches the client back to the original session (zero net navigation); keep does not switch (the confirm path already did the one switch-client).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T2.S1",
                   "title": "restore.sh: keep (no switch) / cancel (switch-client to ORIG_SESSION)",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M5.T1.S1"
