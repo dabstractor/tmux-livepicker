@@ -18,18 +18,22 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "scripts/options.sh — option accessor + defaults table",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Provide get_opt(name, default) and the canonical defaults for every @livepicker-* option in PRD §11, so all other scripts resolve config through one source of truth.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T1.S1",
                   "title": "options.sh: get_opt helper + all defaults",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
-                  "prd_selectors": ["h2.11", "h2.12", "h2.5"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: All sibling plugins (session-history, sessionx, tubular) define an identical get_tmux_option helper (see plan/001_fd5d622d3939/architecture/sibling_plugins_and_env.md §4): `local v; v=\"$(tmux show-option -gqv \"$1\")\"; [ -n \"$v\" ] && echo \"$v\" || echo \"$2\"`. Mirror it as `get_opt`. Shebang `#!/usr/bin/env bash` + `set -u`, NO `-e`. Use `local` and tab indent.\n2. INPUT: None at runtime (defaults are literals from PRD §11). Sourced by other scripts.\n3. LOGIC: Implement get_opt(name, default) per the sibling idiom. Define a defaults lookup so callers can write `get_opt \"@livepicker-type\" \"session\"` — OR expose named helper functions per option (e.g. `opt_type`, `opt_preview_mode`, `opt_fg`, `opt_next_key`, etc.) returning get_opt with the PRD default baked in. Enumerate EVERY option from the PRD §11 table with its exact default: key(required), type(session), create(on), next-key(C-M-Tab), prev-key(C-M-BTab), nav-next-keys(\"Down j\"), nav-prev-keys(\"Up k\"), confirm-keys(Enter), cancel-keys(Escape), backspace-keys(BSpace), preview-mode(live), suppress-window-hook(on), fg(default), bg(default), highlight-fg(black), highlight-bg(yellow), show-count(on), status-format-index(0). Note @livepicker-fg is ALREADY pre-declared as \"#ffffff\" in the user's tmux.conf (verified) — get_opt must surface user overrides over defaults, which the idiom does via show-option -gqv. PRD §11 h3 for exact semantics of create/window-mode interaction and cancel-keys 'clear query, or cancel if empty'.\n4. OUTPUT: A sourced script exposing get_opt and per-option accessors. No side effects. Consumed by every script in P1.M2–P1.M6.\n5. DOCS: Mode A — none yet (greenfield, no existing doc file). The full options table is surfaced in the final README (Mode B, P1.M8). Do not create a separate doc subtask here."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: All sibling plugins (session-history, sessionx, tubular) define an identical get_tmux_option helper (see plan/001_fd5d622d3939/architecture/sibling_plugins_and_env.md §4): `local v; v=\"$(tmux show-option -gqv \"$1\")\"; [ -n \"$v\" ] && echo \"$v\" || echo \"$2\"`. Mirror it as `get_opt`. Shebang `#!/usr/bin/env bash` + `set -u`, NO `-e`. Use `local` and tab indent.\n2. INPUT: None at runtime (defaults are literals from PRD §11). Sourced by other scripts.\n3. LOGIC: Implement get_opt(name, default) per the sibling idiom. Define a defaults lookup so callers can write `get_opt \"@livepicker-type\" \"session\"` — OR expose named helper functions per option (e.g. `opt_type`, `opt_preview_mode`, `opt_fg`, `opt_next_key`, etc.) returning get_opt with the PRD default baked in. Enumerate EVERY option from the PRD §11 table with its exact default: key(required), type(session), create(on), next-key(C-M-Tab), prev-key(C-M-BTab), nav-next-keys(\"Down j\"), nav-prev-keys(\"Up k\"), confirm-keys(Enter), cancel-keys(Escape), backspace-keys(BSpace), preview-mode(live), suppress-window-hook(on), fg(default), bg(default), highlight-fg(black), highlight-bg(yellow), show-count(on), status-format-index(0). Note @livepicker-fg is ALREADY pre-declared as \"#ffffff\" in the user's tmux.conf (verified) — get_opt must surface user overrides over defaults, which the idiom does via show-option -gqv. PRD §11 h3 for exact semantics of create/window-mode interaction and cancel-keys 'clear query, or cancel if empty'.\n4. OUTPUT: A sourced script exposing get_opt and per-option accessors. No side effects. Consumed by every script in P1.M2–P1.M6.\n5. DOCS: Mode A — none yet (greenfield, no existing doc file). The full options table is surfaced in the final README (Mode B, P1.M8). Do not create a separate doc subtask here.",
+                  "prd_selectors": [
+                    "h2.11",
+                    "h2.12",
+                    "h2.5"
+                  ]
                 }
               ]
             },
@@ -37,18 +41,23 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "scripts/utils.sh — safe tmux option helpers + is-set probe",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Generic, reusable tmux option primitives: get/set/unset/save-to-orig, plus an is-set probe that distinguishes a genuinely user-set array index from a tmux default (load-bearing for the status-format save/restore trap).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "utils.sh: tmux option helpers + is_set probe",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [],
-                  "prd_selectors": ["h2.9", "h2.10", "h2.13", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Two traps drive this module (plan/001_fd5d622d3939/architecture/system_context.md §4). (a) status-format restore must `set-option -gu status-format` (unset→default), NOT literal replay, because show-options returns tmux defaults even though tubular unset them. (b) The session-window-changed hook is array-indexed with -b; save the whole show-hooks line. This module provides the primitives to do both safely.\n2. INPUT: option name (string), optional index (for array options like status-format[n]), optional value.\n3. LOGIC: Implement: `tmux_get_opt name [default]` (show-option -gqv); `tmux_set_opt name value` (set-option -g); `tmux_unset_opt name` (set-option -gu — clears array indices too); `tmux_save_opt orig_name src_name` (read src, write to @livepicker-orig-<src>); `tmux_is_set name` — probe whether an option is genuinely user-set vs default. For the is-set probe use the tubular idiom `tmux show-options -g \"$name\" >/dev/null 2>&1` (succeeds when set even to empty); for array indices, `tmux show-options -g \"status-format[$n]\"` exit code distinguishes set-vs-default in tmux 3.x. Also add `tmux_get_hook hookname` that runs `tmux show-hooks -g <hook>` and returns the FULL multi-line output (every `[N]` index), and `tmux_clear_hook hookname` (`set-hook -gu <hook>` clears all indices). Quote all expansions; addresses use exact-match `=` and window ids `@N` never indices (PRD §13, §16 'Window addressing').\n4. OUTPUT: A sourced script exposing the helpers above. Consumed by state.sh, livepicker.sh (save), restore.sh (restore), preview.sh.\n5. DOCS: Mode A — none (internal helper module, no user-facing surface)."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Two traps drive this module (plan/001_fd5d622d3939/architecture/system_context.md §4). (a) status-format restore must `set-option -gu status-format` (unset→default), NOT literal replay, because show-options returns tmux defaults even though tubular unset them. (b) The session-window-changed hook is array-indexed with -b; save the whole show-hooks line. This module provides the primitives to do both safely.\n2. INPUT: option name (string), optional index (for array options like status-format[n]), optional value.\n3. LOGIC: Implement: `tmux_get_opt name [default]` (show-option -gqv); `tmux_set_opt name value` (set-option -g); `tmux_unset_opt name` (set-option -gu — clears array indices too); `tmux_save_opt orig_name src_name` (read src, write to @livepicker-orig-<src>); `tmux_is_set name` — probe whether an option is genuinely user-set vs default. For the is-set probe use the tubular idiom `tmux show-options -g \"$name\" >/dev/null 2>&1` (succeeds when set even to empty); for array indices, `tmux show-options -g \"status-format[$n]\"` exit code distinguishes set-vs-default in tmux 3.x. Also add `tmux_get_hook hookname` that runs `tmux show-hooks -g <hook>` and returns the FULL multi-line output (every `[N]` index), and `tmux_clear_hook hookname` (`set-hook -gu <hook>` clears all indices). Quote all expansions; addresses use exact-match `=` and window ids `@N` never indices (PRD §13, §16 'Window addressing').\n4. OUTPUT: A sourced script exposing the helpers above. Consumed by state.sh, livepicker.sh (save), restore.sh (restore), preview.sh.\n5. DOCS: Mode A — none (internal helper module, no user-facing surface).",
+                  "prd_selectors": [
+                    "h2.9",
+                    "h2.10",
+                    "h2.13",
+                    "h2.16"
+                  ]
                 }
               ]
             },
@@ -65,9 +74,16 @@
                   "title": "state.sh: state accessors + saved-state contract + clear-all",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T2.S1"],
-                  "prd_selectors": ["h2.9", "h2.5", "h2.6", "h2.11"],
-                  "context_scope": "CONTRACT DEFINITION (THIS IS THE INTEGRATION SEAM — P1.M4 and P1.M5 BOTH DEPEND ON IT):\n1. RESEARCH NOTE: State lives in @livepicker-* tmux options for the picker duration and is cleared on exit (PRD §5). The saved-state keys must be EXACTLY what PRD §9 enumerates, verified against the live environment in system_context.md §2/§4.\n2. INPUT: utils.sh helpers (P1.M1.T2.S1).\n3. LOGIC: Implement accessors over @livepicker-* options:\n   - Runtime state: @livepicker-mode (on/off guard), @livepicker-list (newline-separated session names), @livepicker-filter (query string), @livepicker-index (int into filtered list), @livepicker-linked-id (window id of currently linked preview, or empty), @livepicker-type (session|window mirror of option for speed).\n   - SAVED-STATE CONTRACT (written by activate P1.M4.T1.S1, read by restore P1.M5.T3.S1) — define as named constants/helpers, EXACTLY: @livepicker-orig-session, @livepicker-orig-window (window ID, not index), @livepicker-orig-layout (window_layout string), @livepicker-orig-key-table, @livepicker-orig-status (the status line-count value), @livepicker-orig-renumber-windows, @livepicker-orig-session-window-changed (FULL show-hooks output, may be multi-line/multi-index). For status-format[*] save/restore use the -gu trap (do NOT store literal default strings; see system_context.md §4 TRAP 1) — store only a list of indices that were genuinely user-set (via utils is_set probe) so restore can replay just those, then unset the rest.\n   - `clear_all_state`: iterate `tmux show-options -g | grep '@livepicker-'` and unset each (set-option -gu), then `tmux unbind-key -T livepicker` is NOT done here (restore owns key teardown; see P1.M5.T4.S1) — clear_all_state only clears OPTIONS. Guard so it never errors if an option is already unset.\n4. OUTPUT: Sourced script exposing set_state/get_state/clear_all_state and the saved-state key names as a documented contract.\n5. MOCKING: In unit tests, source state.sh against the socket-isolated tmux shim (P1.M7.T1.S1); no real server.\n6. DOCS: Mode A — none (internal module)."
+                  "dependencies": [
+                    "P1.M1.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION (THIS IS THE INTEGRATION SEAM — P1.M4 and P1.M5 BOTH DEPEND ON IT):\n1. RESEARCH NOTE: State lives in @livepicker-* tmux options for the picker duration and is cleared on exit (PRD §5). The saved-state keys must be EXACTLY what PRD §9 enumerates, verified against the live environment in system_context.md §2/§4.\n2. INPUT: utils.sh helpers (P1.M1.T2.S1).\n3. LOGIC: Implement accessors over @livepicker-* options:\n   - Runtime state: @livepicker-mode (on/off guard), @livepicker-list (newline-separated session names), @livepicker-filter (query string), @livepicker-index (int into filtered list), @livepicker-linked-id (window id of currently linked preview, or empty), @livepicker-type (session|window mirror of option for speed).\n   - SAVED-STATE CONTRACT (written by activate P1.M4.T1.S1, read by restore P1.M5.T3.S1) — define as named constants/helpers, EXACTLY: @livepicker-orig-session, @livepicker-orig-window (window ID, not index), @livepicker-orig-layout (window_layout string), @livepicker-orig-key-table, @livepicker-orig-status (the status line-count value), @livepicker-orig-renumber-windows, @livepicker-orig-session-window-changed (FULL show-hooks output, may be multi-line/multi-index). For status-format[*] save/restore use the -gu trap (do NOT store literal default strings; see system_context.md §4 TRAP 1) — store only a list of indices that were genuinely user-set (via utils is_set probe) so restore can replay just those, then unset the rest.\n   - `clear_all_state`: iterate `tmux show-options -g | grep '@livepicker-'` and unset each (set-option -gu), then `tmux unbind-key -T livepicker` is NOT done here (restore owns key teardown; see P1.M5.T4.S1) — clear_all_state only clears OPTIONS. Guard so it never errors if an option is already unset.\n4. OUTPUT: Sourced script exposing set_state/get_state/clear_all_state and the saved-state key names as a documented contract.\n5. MOCKING: In unit tests, source state.sh against the socket-isolated tmux shim (P1.M7.T1.S1); no real server.\n6. DOCS: Mode A — none (internal module).",
+                  "prd_selectors": [
+                    "h2.9",
+                    "h2.5",
+                    "h2.6",
+                    "h2.11"
+                  ]
                 }
               ]
             },
@@ -84,9 +100,15 @@
                   "title": "plugin.tmux: bind activation key (prefix table) + unset guard",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S1"],
-                  "prd_selectors": ["h2.11", "h2.12", "h2.5"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (CRITICAL): prefix is `None`; tubular binds `C-Space` in the ROOT table to switch into the prefix table (system_context.md §5). @livepicker-key is `Space`, which is a PREFIX-TABLE binding. Therefore bind with the DEFAULT table (prefix), NOT `-n`/root: `tmux bind-key \"$KEY\" run-shell \"$CURRENT_DIR/scripts/livepicker.sh\"`. Using -n would shadow tubular's C-Space and break prefix entry. Mirror session-history's session_history.tmux as the cleanest template (CURRENT_DIR idiom, option-driven bind).\n2. INPUT: @livepicker-key (required). The user has it pre-declared as `Space` (verified).\n3. LOGIC: `CURRENT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"`. Source options.sh. Read KEY=get_opt @livepicker-key ''. If empty: `tmux display-message 'tmux-livepicker: set @livepicker-key to activate'` and exit 0 (do not bind). Else bind as above. Shebang #!/usr/bin/env bash. Do NOT set -e (tmux bind may warn).\n4. OUTPUT: A TPM/`run-shell`-loadable plugin.tmux that, on tmux source, installs the prefix-table binding pointing at scripts/livepicker.sh.\n5. MOCKING: Test by sourcing plugin.tmux under the socket shim and asserting the prefix-table binding exists via list-keys -T prefix.\n6. DOCS: Mode A — none (the binding is config; install/usage covered by final README P1.M8)."
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (CRITICAL): prefix is `None`; tubular binds `C-Space` in the ROOT table to switch into the prefix table (system_context.md §5). @livepicker-key is `Space`, which is a PREFIX-TABLE binding. Therefore bind with the DEFAULT table (prefix), NOT `-n`/root: `tmux bind-key \"$KEY\" run-shell \"$CURRENT_DIR/scripts/livepicker.sh\"`. Using -n would shadow tubular's C-Space and break prefix entry. Mirror session-history's session_history.tmux as the cleanest template (CURRENT_DIR idiom, option-driven bind).\n2. INPUT: @livepicker-key (required). The user has it pre-declared as `Space` (verified).\n3. LOGIC: `CURRENT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"`. Source options.sh. Read KEY=get_opt @livepicker-key ''. If empty: `tmux display-message 'tmux-livepicker: set @livepicker-key to activate'` and exit 0 (do not bind). Else bind as above. Shebang #!/usr/bin/env bash. Do NOT set -e (tmux bind may warn).\n4. OUTPUT: A TPM/`run-shell`-loadable plugin.tmux that, on tmux source, installs the prefix-table binding pointing at scripts/livepicker.sh.\n5. MOCKING: Test by sourcing plugin.tmux under the socket shim and asserting the prefix-table binding exists via list-keys -T prefix.\n6. DOCS: Mode A — none (the binding is config; install/usage covered by final README P1.M8).",
+                  "prd_selectors": [
+                    "h2.11",
+                    "h2.12",
+                    "h2.5"
+                  ]
                 }
               ]
             }
@@ -112,9 +134,18 @@
                   "title": "renderer.sh: filter, highlight, count, style emission",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T1.S1", "P1.M1.T2.S1", "P1.M1.T3.S1"],
-                  "prd_selectors": ["h2.6/h3.4", "h2.10", "h2.11", "h2.5/h3.2"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This script runs as a #() status command — it re-executes on every status redraw triggered by `refresh-client -S` (PRD §10; tmux_primitives.md §3). It MUST be fast (<50ms) or the status stutters. Keep it pure: read options, echo one string, exit. No tmux mutations. The default status-interval is 15s; the input handler forces redraws via refresh-client -S (P1.M6).\n2. INPUT (read from tmux options via utils/state): @livepicker-list (newline-separated session names), @livepicker-filter (substring query), @livepicker-index (1-based or 0-based int into the FILTERED list — pick one and document it; recommend 0-based, matching array indexing), @livepicker-type, and the style options @livepicker-fg/bg/highlight-fg/highlight-bg and @livepicker-show-count.\n3. LOGIC: (a) Read list into a bash array (mapfile -t). (b) Filter: keep entries where the lowercased name contains the lowercased filter (case-insensitive substring, PRD §6 Filtering). (c) Clamp/wrap index within [0, len(filtered)-1]; if filtered is empty, render just the query + '(no match)' + count 0/N. (d) Emit ONE line using tmux #[...] style escapes: apply fg/bg to normal items and highlight-fg/highlight-bg to the item at index. (e) If @livepicker-show-count is on, append ` [index+1/len(filtered)]` and show the query, e.g. `query> log [2/5]`. Use `#[default]` resets between segments. Do NOT print a trailing newline that would wrap (status-format is single-line per index). In window mode (@livepicker-type window) the list contains `session:window` tokens and the same logic applies.\n4. OUTPUT: stdout = one tmux-format string for status-format[0]. Exit 0 always (a renderer error must never blank the bar — wrap body in a fallback echo on any failure).\n5. MOCKING: Unit test under socket shim: set the state options to a known list/filter/index, run renderer.sh, grep the output for the highlighted name and the count.\n6. DOCS: Mode A — none (renderer output is internal; styled appearance documented in final README P1.M8)."
+                  "dependencies": [
+                    "P1.M1.T1.S1",
+                    "P1.M1.T2.S1",
+                    "P1.M1.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This script runs as a #() status command — it re-executes on every status redraw triggered by `refresh-client -S` (PRD §10; tmux_primitives.md §3). It MUST be fast (<50ms) or the status stutters. Keep it pure: read options, echo one string, exit. No tmux mutations. The default status-interval is 15s; the input handler forces redraws via refresh-client -S (P1.M6).\n2. INPUT (read from tmux options via utils/state): @livepicker-list (newline-separated session names), @livepicker-filter (substring query), @livepicker-index (1-based or 0-based int into the FILTERED list — pick one and document it; recommend 0-based, matching array indexing), @livepicker-type, and the style options @livepicker-fg/bg/highlight-fg/highlight-bg and @livepicker-show-count.\n3. LOGIC: (a) Read list into a bash array (mapfile -t). (b) Filter: keep entries where the lowercased name contains the lowercased filter (case-insensitive substring, PRD §6 Filtering). (c) Clamp/wrap index within [0, len(filtered)-1]; if filtered is empty, render just the query + '(no match)' + count 0/N. (d) Emit ONE line using tmux #[...] style escapes: apply fg/bg to normal items and highlight-fg/highlight-bg to the item at index. (e) If @livepicker-show-count is on, append ` [index+1/len(filtered)]` and show the query, e.g. `query> log [2/5]`. Use `#[default]` resets between segments. Do NOT print a trailing newline that would wrap (status-format is single-line per index). In window mode (@livepicker-type window) the list contains `session:window` tokens and the same logic applies.\n4. OUTPUT: stdout = one tmux-format string for status-format[0]. Exit 0 always (a renderer error must never blank the bar — wrap body in a fallback echo on any failure).\n5. MOCKING: Unit test under socket shim: set the state options to a known list/filter/index, run renderer.sh, grep the output for the highlighted name and the count.\n6. DOCS: Mode A — none (renderer output is internal; styled appearance documented in final README P1.M8).",
+                  "prd_selectors": [
+                    "h2.6/h3.4",
+                    "h2.10",
+                    "h2.11",
+                    "h2.5/h3.2"
+                  ]
                 }
               ]
             }
@@ -140,9 +171,18 @@
                   "title": "preview.sh: link/unlink/select with id tracking",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T2.S1", "P1.M1.T3.S1"],
-                  "prd_selectors": ["h2.7", "h2.7/h3.8", "h2.13", "h2.16", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED, load-bearing): link-window adds a link, source session KEEPS its window. unlink-window WITHOUT -k removes only the current session's link and FAILS (rather than orphans) if the window is singly-linked — but in this flow the previewed window is always linked in BOTH the source session S and the current session (>=2 links), so unlink without -k succeeds and S keeps its window (tmux_primitives.md §1). Window ids (@N) are server-global and survive renumber-windows on — address by id NEVER index (system_context.md §2 confirms renumber-windows=on). select-window does NOT fire client-session-changed (Invariant A). link/unlink DO fire window-linked/window-unlinked (NOT suppressed — note only).\n2. INPUT: argv[1] = candidate session name S. Reads @livepicker-orig-session (current session, from state contract), @livepicker-linked-id (currently linked window id or empty), and the current session from `tmux display-message -p '#{session_name}'`.\n3. LOGIC (PRD §7 update_preview, verbatim intent):\n   - if S == current_session: `tmux select-window -t \"$ORIG_WINDOW\"` and return (self-session handled in S2; here just no-op-select orig).\n   - src_id = `tmux list-windows -t \"=$S\" -F '#{window_id}' -f '#{window_active}'` (EXACT-MATCH `=$S`; PRD §13). Exactly one line.\n   - if @livepicker-linked-id non-empty AND != src_id: `tmux unlink-window -t \"$CURRENT_SESSION:$LINKED_ID\"` (NO -k). Guard failure (singly-linked edge) by ignoring non-zero exit.\n   - `tmux link-window -a -s \"$src_id\" -t \"$CURRENT_SESSION:\"` (link after active window into current session; bare index picks a free slot).\n   - `tmux select-window -t \"$src_id\"` (show it — all panes, live).\n   - set @livepicker-linked-id = src_id.\n   Wrap link-window in a guard: on ANY failure, fall through to S2 fallback.\n4. OUTPUT: Side effect only (window linked + selected, linked-id updated). Exit 0 on success, non-zero only if fallback also fails (caller decides).\n5. MOCKING: Test under socket shim with >=2 sessions, one having a multi-pane window; call preview.sh S2 and assert via list-windows that S2's window id now appears in the driver session AND remains in S2, and that the driver client's session is unchanged.\n6. DOCS: Mode A — none (internal; behavior summarized in final README P1.M8)."
+                  "dependencies": [
+                    "P1.M1.T2.S1",
+                    "P1.M1.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED, load-bearing): link-window adds a link, source session KEEPS its window. unlink-window WITHOUT -k removes only the current session's link and FAILS (rather than orphans) if the window is singly-linked — but in this flow the previewed window is always linked in BOTH the source session S and the current session (>=2 links), so unlink without -k succeeds and S keeps its window (tmux_primitives.md §1). Window ids (@N) are server-global and survive renumber-windows on — address by id NEVER index (system_context.md §2 confirms renumber-windows=on). select-window does NOT fire client-session-changed (Invariant A). link/unlink DO fire window-linked/window-unlinked (NOT suppressed — note only).\n2. INPUT: argv[1] = candidate session name S. Reads @livepicker-orig-session (current session, from state contract), @livepicker-linked-id (currently linked window id or empty), and the current session from `tmux display-message -p '#{session_name}'`.\n3. LOGIC (PRD §7 update_preview, verbatim intent):\n   - if S == current_session: `tmux select-window -t \"$ORIG_WINDOW\"` and return (self-session handled in S2; here just no-op-select orig).\n   - src_id = `tmux list-windows -t \"=$S\" -F '#{window_id}' -f '#{window_active}'` (EXACT-MATCH `=$S`; PRD §13). Exactly one line.\n   - if @livepicker-linked-id non-empty AND != src_id: `tmux unlink-window -t \"$CURRENT_SESSION:$LINKED_ID\"` (NO -k). Guard failure (singly-linked edge) by ignoring non-zero exit.\n   - `tmux link-window -a -s \"$src_id\" -t \"$CURRENT_SESSION:\"` (link after active window into current session; bare index picks a free slot).\n   - `tmux select-window -t \"$src_id\"` (show it — all panes, live).\n   - set @livepicker-linked-id = src_id.\n   Wrap link-window in a guard: on ANY failure, fall through to S2 fallback.\n4. OUTPUT: Side effect only (window linked + selected, linked-id updated). Exit 0 on success, non-zero only if fallback also fails (caller decides).\n5. MOCKING: Test under socket shim with >=2 sessions, one having a multi-pane window; call preview.sh S2 and assert via list-windows that S2's window id now appears in the driver session AND remains in S2, and that the driver client's session is unchanged.\n6. DOCS: Mode A — none (internal; behavior summarized in final README P1.M8).",
+                  "prd_selectors": [
+                    "h2.7",
+                    "h2.7/h3.8",
+                    "h2.13",
+                    "h2.16",
+                    "h2.14"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -150,9 +190,17 @@
                   "title": "preview.sh: self-session edge case + capture-pane fallback + mode gate",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M3.T1.S1"],
-                  "prd_selectors": ["h2.7/h3.8", "h2.7/h3.9", "h2.7/h3.10", "h2.11", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: A session cannot link its own window into itself — linking fails (tmux_primitives.md §1 caveat). The self-session case must short-circuit BEFORE attempting link. capture-pane -ep -t \"=$S\" resolves to S's active pane and prints escapes to stdout (tmux_primitives.md §6).\n2. INPUT: same as S1 plus @livepicker-preview-mode (live|snapshot|off) and @livepicker-orig-window (for self-session select).\n3. LOGIC (PRD §7 Fallbacks + Self-session edge case):\n   - If @livepicker-preview-mode == off: return immediately, show nothing.\n   - If == snapshot: skip linking; `tmux capture-pane -ep -t \"=$S\"` and (the picker area is the live client area — for snapshot mode the captured text is a best-effort hint; document that snapshot is single-pane/non-live per PRD §7). At minimum do not link.\n   - If == live (default):\n     * If S == current_session: do NOT link (would error). `tmux select-window -t \"$ORIG_WINDOW\"` so the user sees their own session as the preview. Clear @livepicker-linked-id (nothing to unlink on exit for this case unless a prior link exists — still unlink any prior LINKED_ID first per S1).\n     * Else attempt the S1 link flow; on ANY failure (link error, already-linked, invalid target) fall back to the snapshot capture-pane path so the picker never blocks.\n4. OUTPUT: Same side-effect contract as S1; never blocks the picker on a preview failure.\n5. MOCKING: Test (a) self-session highlight does not attempt link and selects orig window; (b) forcing a link failure (e.g. target session with no windows) falls back to capture without error; (c) preview-mode=off renders nothing.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: A session cannot link its own window into itself — linking fails (tmux_primitives.md §1 caveat). The self-session case must short-circuit BEFORE attempting link. capture-pane -ep -t \"=$S\" resolves to S's active pane and prints escapes to stdout (tmux_primitives.md §6).\n2. INPUT: same as S1 plus @livepicker-preview-mode (live|snapshot|off) and @livepicker-orig-window (for self-session select).\n3. LOGIC (PRD §7 Fallbacks + Self-session edge case):\n   - If @livepicker-preview-mode == off: return immediately, show nothing.\n   - If == snapshot: skip linking; `tmux capture-pane -ep -t \"=$S\"` and (the picker area is the live client area — for snapshot mode the captured text is a best-effort hint; document that snapshot is single-pane/non-live per PRD §7). At minimum do not link.\n   - If == live (default):\n     * If S == current_session: do NOT link (would error). `tmux select-window -t \"$ORIG_WINDOW\"` so the user sees their own session as the preview. Clear @livepicker-linked-id (nothing to unlink on exit for this case unless a prior link exists — still unlink any prior LINKED_ID first per S1).\n     * Else attempt the S1 link flow; on ANY failure (link error, already-linked, invalid target) fall back to the snapshot capture-pane path so the picker never blocks.\n4. OUTPUT: Same side-effect contract as S1; never blocks the picker on a preview failure.\n5. MOCKING: Test (a) self-session highlight does not attempt link and selects orig window; (b) forcing a link failure (e.g. target session with no windows) falls back to capture without error; (c) preview-mode=off renders nothing.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.7/h3.8",
+                    "h2.7/h3.9",
+                    "h2.7/h3.10",
+                    "h2.11",
+                    "h2.16"
+                  ]
                 }
               ]
             }
@@ -178,9 +226,17 @@
                   "title": "livepicker.sh: double-activation guard + full state save",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T2.S1", "P1.M1.T3.S1"],
-                  "prd_selectors": ["h2.6/h3.3", "h2.9", "h2.16", "h2.5/h3.2"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Double-activation guard via @livepicker-mode (PRD §6 Activation step 1, §16). Save list is PRD §9 verified against live env in system_context.md §2/§4: status=on, key-table=root, renumber-windows=on, the session-window-changed[0] hook with -b and absolute path, status-format[*] appearing as defaults (use -gu on restore, NOT literal replay — TRAP 1). Capture window_layout via `tmux display-message -p '#{window_layout}'` for the active window; capture window ID via '#{window_id}' (NOT index); session via '#{session_name}'.\n2. INPUT: utils.sh + state.sh contract (P1.M1.T3.S1).\n3. LOGIC (PRD §6 Activation steps 1-2):\n   - If get_state mode == on: exit 0 silently (guard).\n   - Save into the state-contract keys: orig-session=`#{session_name}`, orig-window=`#{window_id}`, orig-layout=`#{window_layout}`, orig-key-table=`show-options -gv key-table`, orig-status=`show-options -gv status`, orig-renumber-windows=`show-options -gv renumber-windows`, orig-session-window-changed=FULL `show-hooks -g session-window-changed` output (multi-line ok). For status-format[*]: probe indices 0..9 with utils is_set; store the list of GENUINELY-user-set indices + their values (in this env none are user-set, so the list is empty — restore will just -gu). Initialize @livepicker-linked-id='' (no preview linked yet).\n4. OUTPUT: @livepicker-orig-* populated per contract; @livepicker-mode not yet on (set last, in P1.M4.T5.S1). Idempotent-safe: re-running with mode on is a no-op.\n5. MOCKING: Test under socket shim: run activate's save block, assert each @livepicker-orig-* matches the live value, assert mode guard blocks a second run.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M1.T2.S1",
+                    "P1.M1.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Double-activation guard via @livepicker-mode (PRD §6 Activation step 1, §16). Save list is PRD §9 verified against live env in system_context.md §2/§4: status=on, key-table=root, renumber-windows=on, the session-window-changed[0] hook with -b and absolute path, status-format[*] appearing as defaults (use -gu on restore, NOT literal replay — TRAP 1). Capture window_layout via `tmux display-message -p '#{window_layout}'` for the active window; capture window ID via '#{window_id}' (NOT index); session via '#{session_name}'.\n2. INPUT: utils.sh + state.sh contract (P1.M1.T3.S1).\n3. LOGIC (PRD §6 Activation steps 1-2):\n   - If get_state mode == on: exit 0 silently (guard).\n   - Save into the state-contract keys: orig-session=`#{session_name}`, orig-window=`#{window_id}`, orig-layout=`#{window_layout}`, orig-key-table=`show-options -gv key-table`, orig-status=`show-options -gv status`, orig-renumber-windows=`show-options -gv renumber-windows`, orig-session-window-changed=FULL `show-hooks -g session-window-changed` output (multi-line ok). For status-format[*]: probe indices 0..9 with utils is_set; store the list of GENUINELY-user-set indices + their values (in this env none are user-set, so the list is empty — restore will just -gu). Initialize @livepicker-linked-id='' (no preview linked yet).\n4. OUTPUT: @livepicker-orig-* populated per contract; @livepicker-mode not yet on (set last, in P1.M4.T5.S1). Idempotent-safe: re-running with mode on is a no-op.\n5. MOCKING: Test under socket shim: run activate's save block, assert each @livepicker-orig-* matches the live value, assert mode guard blocks a second run.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.3",
+                    "h2.9",
+                    "h2.16",
+                    "h2.5/h3.2"
+                  ]
                 }
               ]
             },
@@ -197,9 +253,16 @@
                   "title": "livepicker.sh: list-sessions + initial filter/index",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M4.T1.S1"],
-                  "prd_selectors": ["h2.6/h3.3", "h2.5/h3.2", "h2.13", "h2.11"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: `tmux list-sessions -F '#{session_name}'` yields one name per line in tmux default order (no MRU — PRD §2 non-goals). 15 sessions exist on this machine (verified). For window mode, the list is built from `tmux list-windows -a -F '#{session_name}:#{window_index}'` (PRD §11 type=window; PRD §6 Confirm window branch).\n2. INPUT: @livepicker-type (session|window) and @livepicker-orig-session from the state contract.\n3. LOGIC (PRD §6 Activation step 3 + step 6 initial selection):\n   - If type==session: `tmux list-sessions -F '#{session_name}'` → store newline-joined into @livepicker-list.\n   - If type==window: build `session:window` tokens across all sessions.\n   - Set @livepicker-filter='' (empty query → full list).\n   - Set @livepicker-index to the position of the current session (or current session:window) within the FULL list, so the initial highlight+preview is the user's own session (PRD §6 step 6, §3 user story 1).\n4. OUTPUT: @livepicker-list, @livepicker-filter, @livepicker-index populated and mutually consistent (index valid for the unfiltered list).\n5. MOCKING: Test list-building and initial-index resolution under the shim with a known session set.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M4.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: `tmux list-sessions -F '#{session_name}'` yields one name per line in tmux default order (no MRU — PRD §2 non-goals). 15 sessions exist on this machine (verified). For window mode, the list is built from `tmux list-windows -a -F '#{session_name}:#{window_index}'` (PRD §11 type=window; PRD §6 Confirm window branch).\n2. INPUT: @livepicker-type (session|window) and @livepicker-orig-session from the state contract.\n3. LOGIC (PRD §6 Activation step 3 + step 6 initial selection):\n   - If type==session: `tmux list-sessions -F '#{session_name}'` → store newline-joined into @livepicker-list.\n   - If type==window: build `session:window` tokens across all sessions.\n   - Set @livepicker-filter='' (empty query → full list).\n   - Set @livepicker-index to the position of the current session (or current session:window) within the FULL list, so the initial highlight+preview is the user's own session (PRD §6 step 6, §3 user story 1).\n4. OUTPUT: @livepicker-list, @livepicker-filter, @livepicker-index populated and mutually consistent (index valid for the unfiltered list).\n5. MOCKING: Test list-building and initial-index resolution under the shim with a known session set.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.3",
+                    "h2.5/h3.2",
+                    "h2.13",
+                    "h2.11"
+                  ]
                 }
               ]
             },
@@ -216,9 +279,17 @@
                   "title": "livepicker.sh: status grow (shift + install + set count)",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M4.T1.S1", "P1.M2.T1.S1"],
-                  "prd_selectors": ["h2.10", "h2.9", "h2.11", "h2.5/h3.2"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant C, system_context.md §3): with status=2, status-format[0]=#(renderer.sh) and status-format[1] UNSET, line 2 renders tmux's default composite = the user's tubular window-status line. Shifting indices HIGHEST-FIRST is race-free (PRD §10 step 2; tmux_primitives.md §3). The user's @livepicker-status-format-index default is 0.\n2. INPUT: @livepicker-status-format-index (default 0), the saved status-format user-set indices from P1.M4.T1.S1, renderer.sh path (P1.M2.T1.S1), SCRIPT_DIR.\n3. LOGIC (PRD §10 steps 2-4, verbatim):\n   - For each GENUINELY-user-set status-format index n (from the save in P1.M4.T1.S1), highest first: `tmux set-option -g \"status-format[$((n+1))]\" \"$captured_value\"` then unset the original `status-format[$n]` (so we don't double-set). In this env there are none user-set, so this loop is a no-op and line 2 falls through to the default composite — exactly desired.\n   - `tmux set-option -g \"status-format[$IDX]\" \"#($SCRIPT_DIR/scripts/renderer.sh)\"` where IDX=@livepicker-status-format-index (0).\n   - `tmux set-option -g status $((orig_status_count + 1))` — typically 2. (orig status was `on`/1 → 2.)\n   - Do NOT touch status-left/status-right/window-status-format (tubular owns them; they must persist so line 2 renders). system_context.md §10.\n4. OUTPUT: status bar grown by one line; picker renderer installed at the configured index; user's normal status visible on the line below.\n5. MOCKING: Test under shim: set status-format[0] to a known user value, activate, assert it shifted to [1] and [0] is the renderer, status==2; on the real tubular env (manual) confirm line 2 shows the window list.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M4.T1.S1",
+                    "P1.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant C, system_context.md §3): with status=2, status-format[0]=#(renderer.sh) and status-format[1] UNSET, line 2 renders tmux's default composite = the user's tubular window-status line. Shifting indices HIGHEST-FIRST is race-free (PRD §10 step 2; tmux_primitives.md §3). The user's @livepicker-status-format-index default is 0.\n2. INPUT: @livepicker-status-format-index (default 0), the saved status-format user-set indices from P1.M4.T1.S1, renderer.sh path (P1.M2.T1.S1), SCRIPT_DIR.\n3. LOGIC (PRD §10 steps 2-4, verbatim):\n   - For each GENUINELY-user-set status-format index n (from the save in P1.M4.T1.S1), highest first: `tmux set-option -g \"status-format[$((n+1))]\" \"$captured_value\"` then unset the original `status-format[$n]` (so we don't double-set). In this env there are none user-set, so this loop is a no-op and line 2 falls through to the default composite — exactly desired.\n   - `tmux set-option -g \"status-format[$IDX]\" \"#($SCRIPT_DIR/scripts/renderer.sh)\"` where IDX=@livepicker-status-format-index (0).\n   - `tmux set-option -g status $((orig_status_count + 1))` — typically 2. (orig status was `on`/1 → 2.)\n   - Do NOT touch status-left/status-right/window-status-format (tubular owns them; they must persist so line 2 renders). system_context.md §10.\n4. OUTPUT: status bar grown by one line; picker renderer installed at the configured index; user's normal status visible on the line below.\n5. MOCKING: Test under shim: set status-format[0] to a known user value, activate, assert it shifted to [1] and [0] is the renderer, status==2; on the real tubular env (manual) confirm line 2 shows the window list.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.10",
+                    "h2.9",
+                    "h2.11",
+                    "h2.5/h3.2"
+                  ]
                 }
               ]
             },
@@ -235,9 +306,20 @@
                   "title": "livepicker.sh: build livepicker key table (input + nav + copied bindings)",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M4.T1.S1", "P1.M1.T1.S1"],
-                  "prd_selectors": ["h2.8", "h2.8/h3.13", "h2.8/h3.14", "h2.8/h3.15", "h2.8/h3.16", "h2.11", "h2.7/h3.12"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant B, system_context.md §3): while key-table=livepicker, tmux consults ONLY that table; unbound keys are DROPPED, never passed to root/prefix/pane. Therefore the user's prefix+root bindings do NOT fire during the picker UNLESS explicitly copied. PRD §8 step 'copy list-keys -T prefix and -T root, rewrite each line's table to livepicker, re-bind' is NECESSARY. Confirmed user window-nav keys: root-table C-M-Tab / C-M-BTab compound swap-window;select-window (system_context.md §2).\n2. INPUT: options.sh key defaults (@livepicker-next-key=C-M-Tab, prev-key=C-M-BTab, nav-next-keys='Down j', nav-prev-keys='Up k', confirm-keys=Enter, cancel-keys=Escape, backspace-keys=BSpace), SCRIPT_DIR.\n3. LOGIC (PRD §8 Binding + §6):\n   - Bind typing keys: a-z, A-Z, 0-9, and the punctuation `-_. /` (PRD §8) each to `run-shell \"$SCRIPT_DIR/scripts/input-handler.sh type <char>\"`. Iterate the character sets; quote each key.\n   - Bind @livepicker-backspace-keys (BSpace) → input-handler.sh backspace.\n   - Bind @livepicker-confirm-keys (Enter) → input-handler.sh confirm.\n   - Bind @livepicker-cancel-keys (Escape) → input-handler.sh cancel.\n   - Bind @livepicker-next-key + nav-next-keys (Down, j) → input-handler.sh next-session.\n   - Bind @livepicker-prev-key + nav-prev-keys (Up, k) → input-handler.sh prev-session.\n   - COPY the user's bindings: `tmux list-keys -T prefix` and `tmux list-keys -T root`, and for each line rewrite the table token to `livepicker` and re-bind via `tmux bind-key -T livepicker ...`. This preserves the rest of the user's keybinds during the picker. (Be careful NOT to re-copy the window-nav keys into a conflicting binding — the explicit next/prev bindings above take precedence; skip lines whose key equals next-key/prev-key to avoid double-bind.)\n   - `tmux set-option key-table livepicker` (switch the active table).\n   NOTE: do not implement discovery here unless @livepicker-next-key/prev-key are unset — defaults are hardcoded to the user's keys per PRD §8; discovery is optional/best-effort and must not override explicit options.\n4. OUTPUT: livepicker key-table fully populated; active key-table switched. All input routes through scripts/input-handler.sh.\n5. MOCKING: Test under shim: activate, assert key-table==livepicker, assert a typed key is bound to input-handler type, assert a user prefix binding (e.g. the C-r reload) is present in the livepicker table.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M4.T1.S1",
+                    "P1.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant B, system_context.md §3): while key-table=livepicker, tmux consults ONLY that table; unbound keys are DROPPED, never passed to root/prefix/pane. Therefore the user's prefix+root bindings do NOT fire during the picker UNLESS explicitly copied. PRD §8 step 'copy list-keys -T prefix and -T root, rewrite each line's table to livepicker, re-bind' is NECESSARY. Confirmed user window-nav keys: root-table C-M-Tab / C-M-BTab compound swap-window;select-window (system_context.md §2).\n2. INPUT: options.sh key defaults (@livepicker-next-key=C-M-Tab, prev-key=C-M-BTab, nav-next-keys='Down j', nav-prev-keys='Up k', confirm-keys=Enter, cancel-keys=Escape, backspace-keys=BSpace), SCRIPT_DIR.\n3. LOGIC (PRD §8 Binding + §6):\n   - Bind typing keys: a-z, A-Z, 0-9, and the punctuation `-_. /` (PRD §8) each to `run-shell \"$SCRIPT_DIR/scripts/input-handler.sh type <char>\"`. Iterate the character sets; quote each key.\n   - Bind @livepicker-backspace-keys (BSpace) → input-handler.sh backspace.\n   - Bind @livepicker-confirm-keys (Enter) → input-handler.sh confirm.\n   - Bind @livepicker-cancel-keys (Escape) → input-handler.sh cancel.\n   - Bind @livepicker-next-key + nav-next-keys (Down, j) → input-handler.sh next-session.\n   - Bind @livepicker-prev-key + nav-prev-keys (Up, k) → input-handler.sh prev-session.\n   - COPY the user's bindings: `tmux list-keys -T prefix` and `tmux list-keys -T root`, and for each line rewrite the table token to `livepicker` and re-bind via `tmux bind-key -T livepicker ...`. This preserves the rest of the user's keybinds during the picker. (Be careful NOT to re-copy the window-nav keys into a conflicting binding — the explicit next/prev bindings above take precedence; skip lines whose key equals next-key/prev-key to avoid double-bind.)\n   - `tmux set-option key-table livepicker` (switch the active table).\n   NOTE: do not implement discovery here unless @livepicker-next-key/prev-key are unset — defaults are hardcoded to the user's keys per PRD §8; discovery is optional/best-effort and must not override explicit options.\n4. OUTPUT: livepicker key-table fully populated; active key-table switched. All input routes through scripts/input-handler.sh.\n5. MOCKING: Test under shim: activate, assert key-table==livepicker, assert a typed key is bound to input-handler type, assert a user prefix binding (e.g. the C-r reload) is present in the livepicker table.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.8",
+                    "h2.8/h3.13",
+                    "h2.8/h3.14",
+                    "h2.8/h3.15",
+                    "h2.8/h3.16",
+                    "h2.11",
+                    "h2.7/h3.12"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -245,9 +327,18 @@
                   "title": "livepicker.sh: suppress session-window-changed hook",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M4.T1.S1", "P1.M1.T2.S1"],
-                  "prd_selectors": ["h2.7/h3.11", "h2.9", "h2.16", "h2.11", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — TRAP 2, system_context.md §4): the live hook is `session-window-changed[0] run-shell -b /home/dustin/.config/tmux/scripts/sync-window-focus.sh`. select-window DURING preview fires this hook repeatedly; without suppression the user's sync-window-focus.sh spams focus bytes into the linked preview window. Suppression is GLOBAL for the picker duration and must restore EXACTLY (including -b and absolute path). set-hook -gu clears all indices (system_context.md §7 recipe). Default @livepicker-suppress-window-hook=on.\n2. INPUT: @livepicker-suppress-window-hook (on|off), the saved @livepicker-orig-session-window-changed (full show-hooks output from P1.M4.T1.S1).\n3. LOGIC: If suppress==on: `tmux set-hook -gu session-window-changed` (clear all indices). If off: leave the hook intact (preview navigation will run sync-window-focus.sh — documented behavior). The restore counterpart is in P1.M5.T3.S1.\n4. OUTPUT: hook cleared (or intentionally left) for the picker duration.\n5. MOCKING: Test under shim with a hook that appends to a log file; activate with suppress on, do several select-windows, assert the log did not grow.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M4.T1.S1",
+                    "P1.M1.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — TRAP 2, system_context.md §4): the live hook is `session-window-changed[0] run-shell -b /home/dustin/.config/tmux/scripts/sync-window-focus.sh`. select-window DURING preview fires this hook repeatedly; without suppression the user's sync-window-focus.sh spams focus bytes into the linked preview window. Suppression is GLOBAL for the picker duration and must restore EXACTLY (including -b and absolute path). set-hook -gu clears all indices (system_context.md §7 recipe). Default @livepicker-suppress-window-hook=on.\n2. INPUT: @livepicker-suppress-window-hook (on|off), the saved @livepicker-orig-session-window-changed (full show-hooks output from P1.M4.T1.S1).\n3. LOGIC: If suppress==on: `tmux set-hook -gu session-window-changed` (clear all indices). If off: leave the hook intact (preview navigation will run sync-window-focus.sh — documented behavior). The restore counterpart is in P1.M5.T3.S1.\n4. OUTPUT: hook cleared (or intentionally left) for the picker duration.\n5. MOCKING: Test under shim with a hook that appends to a log file; activate with suppress on, do several select-windows, assert the log did not grow.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.7/h3.11",
+                    "h2.9",
+                    "h2.16",
+                    "h2.11",
+                    "h2.14"
+                  ]
                 }
               ]
             },
@@ -264,9 +355,18 @@
                   "title": "livepicker.sh: first preview (self-session) + set mode on + refresh",
                   "status": "Planned",
                   "story_points": 0.5,
-                  "dependencies": ["P1.M4.T2.S1", "P1.M4.T3.S1", "P1.M4.T4.S1", "P1.M3.T1.S2"],
-                  "prd_selectors": ["h2.6/h3.3", "h2.7/h3.10", "h2.5/h3.2"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: The initial highlight is the current session, so the first preview is the SELF-SESSION case (P1.M3.T1.S2): no link, select-window to ORIG_WINDOW. refresh-client -S forces the renderer's first draw (PRD §10).\n2. INPUT: preview.sh (P1.M3.T1.S2), state.sh set_state, the current session name from @livepicker-orig-session.\n3. LOGIC (PRD §6 Activation steps 6-7): `\"$SCRIPT_DIR/scripts/preview.sh\" \"$ORIG_SESSION\"` (self-session path). Then `tmux set-option -g @livepicker-mode on` (guard now armed). Then `tmux refresh-client -S` so the renderer draws immediately. Order matters: mode-on is LAST so a crash mid-activate leaves mode off (re-activatable) rather than stuck.\n4. OUTPUT: Picker fully active; status showing renderer; preview showing current session; mode guard on.\n5. MOCKING: End-to-end activate test under shim asserts mode==on, status==2, key-table==livepicker, renderer installed.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M4.T2.S1",
+                    "P1.M4.T3.S1",
+                    "P1.M4.T4.S1",
+                    "P1.M3.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: The initial highlight is the current session, so the first preview is the SELF-SESSION case (P1.M3.T1.S2): no link, select-window to ORIG_WINDOW. refresh-client -S forces the renderer's first draw (PRD §10).\n2. INPUT: preview.sh (P1.M3.T1.S2), state.sh set_state, the current session name from @livepicker-orig-session.\n3. LOGIC (PRD §6 Activation steps 6-7): `\"$SCRIPT_DIR/scripts/preview.sh\" \"$ORIG_SESSION\"` (self-session path). Then `tmux set-option -g @livepicker-mode on` (guard now armed). Then `tmux refresh-client -S` so the renderer draws immediately. Order matters: mode-on is LAST so a crash mid-activate leaves mode off (re-activatable) rather than stuck.\n4. OUTPUT: Picker fully active; status showing renderer; preview showing current session; mode guard on.\n5. MOCKING: End-to-end activate test under shim asserts mode==on, status==2, key-table==livepicker, renderer installed.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.3",
+                    "h2.7/h3.10",
+                    "h2.5/h3.2"
+                  ]
                 }
               ]
             }
@@ -292,9 +392,17 @@
                   "title": "restore.sh: unlink preview + select-window to ORIG_WINDOW",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T3.S1", "P1.M1.T2.S1"],
-                  "prd_selectors": ["h2.9", "h2.7/h3.8", "h2.13", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: unlink-window without -k removes only the current session's link; the source session S keeps its window (verified, tmux_primitives.md §1). Track @livepicker-linked-id; if empty (self-session was highlighted) there is nothing to unlink. Guard non-zero exit (singly-linked edge) by ignoring. ORIG_WINDOW is a window ID (not index).\n2. INPUT: argv[1] = 'keep' | 'cancel'. Reads @livepicker-linked-id, @livepicker-orig-window, @livepicker-orig-session from the state contract.\n3. LOGIC (PRD §9 restore step 1-2):\n   - If @livepicker-linked-id non-empty: `tmux unlink-window -t \"$CURRENT_SESSION:$LINKED_ID\"` (NO -k). Ignore failure.\n   - `tmux select-window -t \"$ORIG_WINDOW\"` (back to the original window in the current session). current_session = `tmux display-message -p '#{session_name}'`.\n4. OUTPUT: preview window unlinked from current session; original window selected. Candidate sessions' windows intact (assertable via list-windows before/after).\n5. MOCKING: Test under shim: link a window via preview.sh, run restore, assert the window id no longer appears in the driver session but still appears in its origin session.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M1.T3.S1",
+                    "P1.M1.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: unlink-window without -k removes only the current session's link; the source session S keeps its window (verified, tmux_primitives.md §1). Track @livepicker-linked-id; if empty (self-session was highlighted) there is nothing to unlink. Guard non-zero exit (singly-linked edge) by ignoring. ORIG_WINDOW is a window ID (not index).\n2. INPUT: argv[1] = 'keep' | 'cancel'. Reads @livepicker-linked-id, @livepicker-orig-window, @livepicker-orig-session from the state contract.\n3. LOGIC (PRD §9 restore step 1-2):\n   - If @livepicker-linked-id non-empty: `tmux unlink-window -t \"$CURRENT_SESSION:$LINKED_ID\"` (NO -k). Ignore failure.\n   - `tmux select-window -t \"$ORIG_WINDOW\"` (back to the original window in the current session). current_session = `tmux display-message -p '#{session_name}'`.\n4. OUTPUT: preview window unlinked from current session; original window selected. Candidate sessions' windows intact (assertable via list-windows before/after).\n5. MOCKING: Test under shim: link a window via preview.sh, run restore, assert the window id no longer appears in the driver session but still appears in its origin session.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.9",
+                    "h2.7/h3.8",
+                    "h2.13",
+                    "h2.16"
+                  ]
                 }
               ]
             },
@@ -311,9 +419,17 @@
                   "title": "restore.sh: keep (no switch) / cancel (switch-client to ORIG_SESSION)",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M5.T1.S1"],
-                  "prd_selectors": ["h2.9", "h2.6/h3.6", "h2.6/h3.7", "h2.14", "h2.13"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant A, system_context.md §3): cancel does ZERO switch-client to a different session → zero history entries. keep does NOT switch here because confirm (P1.M6.T3.S1) already issued the ONE switch-client to the chosen target. switch-client -t '=S' uses exact-match (PRD §13). This is the crux of the pollution invariant.\n2. INPUT: argv[1] = 'keep' | 'cancel'. @livepicker-orig-session.\n3. LOGIC (PRD §9 restore step 3):\n   - If cancel: `tmux switch-client -t \"=$ORIG_SESSION\"` (exact-match). This returns the client to where it started; client-session-changed fires ONCE back to original — but since no forward navigation was recorded while browsing, this restores the pre-activation timeline exactly. (Confirm this with the pollution test P1.M7.T5.S1.)\n   - If keep: do nothing here (the client is already on the chosen target from confirm's switch-client).\n4. OUTPUT: client positioned correctly with exactly the intended number of session switches (0 for cancel, 1 for keep — the one from confirm).\n5. MOCKING: Test under shim with a fake history recorder on client-session-changed: browse then cancel → 0 entries; browse then confirm → exactly 1.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M5.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant A, system_context.md §3): cancel does ZERO switch-client to a different session → zero history entries. keep does NOT switch here because confirm (P1.M6.T3.S1) already issued the ONE switch-client to the chosen target. switch-client -t '=S' uses exact-match (PRD §13). This is the crux of the pollution invariant.\n2. INPUT: argv[1] = 'keep' | 'cancel'. @livepicker-orig-session.\n3. LOGIC (PRD §9 restore step 3):\n   - If cancel: `tmux switch-client -t \"=$ORIG_SESSION\"` (exact-match). This returns the client to where it started; client-session-changed fires ONCE back to original — but since no forward navigation was recorded while browsing, this restores the pre-activation timeline exactly. (Confirm this with the pollution test P1.M7.T5.S1.)\n   - If keep: do nothing here (the client is already on the chosen target from confirm's switch-client).\n4. OUTPUT: client positioned correctly with exactly the intended number of session switches (0 for cancel, 1 for keep — the one from confirm).\n5. MOCKING: Test under shim with a fake history recorder on client-session-changed: browse then cancel → 0 entries; browse then confirm → exactly 1.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.9",
+                    "h2.6/h3.6",
+                    "h2.6/h3.7",
+                    "h2.14",
+                    "h2.13"
+                  ]
                 }
               ]
             },
@@ -322,8 +438,7 @@
               "id": "P1.M5.T3",
               "title": "Restore: status / key-table / renumber / hook",
               "status": "Planned",
-          "description": "Restore the global options and the suppressed hook to their exact pre-activation values.",
-              "status": "Planned",
+              "description": "Restore the global options and the suppressed hook to their exact pre-activation values.",
               "subtasks": [
                 {
                   "type": "Subtask",
@@ -331,9 +446,18 @@
                   "title": "restore.sh: restore status, status-format (-gu trap), key-table, renumber, hook",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M5.T1.S1", "P1.M4.T4.S2"],
-                  "prd_selectors": ["h2.9", "h2.10", "h2.7/h3.11", "h2.16", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — TRAP 1 + TRAP 2, system_context.md §4): status-format must be restored via `set-option -gu status-format` (unset→default) NOT literal replay, because show-options returns tmux defaults in this tubular env. The hook must be restored EXACTLY including -b and absolute path: `set-hook -g session-window-changed \"run-shell -b /home/dustin/.config/tmux/scripts/sync-window-focus.sh\"`.\n2. INPUT: state-contract saved values: @livepicker-orig-status, the saved user-set status-format indices+values (likely empty here), @livepicker-orig-key-table, @livepicker-orig-renumber-windows, @livepicker-orig-session-window-changed, @livepicker-suppress-window-hook.\n3. LOGIC (PRD §9 restore step 4, with the env-verified corrections):\n   - status-format: `tmux set-option -gu status-format` (clear all → default composite). THEN, for each index that was GENUINELY user-set at save time (from P1.M4.T1.S1), `tmux set-option -g \"status-format[$n]\" \"$value\"`. (In this env: just the -gu.)\n   - status: `tmux set-option -g status \"$ORIG_STATUS\"` (restore line count, e.g. back to `on`/1).\n   - key-table: `tmux set-option key-table \"$ORIG_KEY_TABLE\"` (typically root).\n   - renumber-windows: `tmux set-option -g renumber-windows \"$ORIG_RENUMBER\"`.\n   - hook: if @livepicker-suppress-window-hook==on: replay every saved `show-hooks` line. For each saved line `session-window-changed[N] <cmd>`: `tmux set-hook -g session-window-changed \"<cmd>\"` (preserving -b). If nothing was saved, `set-hook -gu session-window-changed` (leave unset).\n4. OUTPUT: All global options + hook byte-identical to pre-activation (assertable by diffing show-options/show-hooks before vs after).\n5. MOCKING: Test under shim: snapshot show-options -g + show-hooks -g before activate; activate; restore cancel; assert the snapshot diffs to nothing.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M5.T1.S1",
+                    "P1.M4.T4.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — TRAP 1 + TRAP 2, system_context.md §4): status-format must be restored via `set-option -gu status-format` (unset→default) NOT literal replay, because show-options returns tmux defaults in this tubular env. The hook must be restored EXACTLY including -b and absolute path: `set-hook -g session-window-changed \"run-shell -b /home/dustin/.config/tmux/scripts/sync-window-focus.sh\"`.\n2. INPUT: state-contract saved values: @livepicker-orig-status, the saved user-set status-format indices+values (likely empty here), @livepicker-orig-key-table, @livepicker-orig-renumber-windows, @livepicker-orig-session-window-changed, @livepicker-suppress-window-hook.\n3. LOGIC (PRD §9 restore step 4, with the env-verified corrections):\n   - status-format: `tmux set-option -gu status-format` (clear all → default composite). THEN, for each index that was GENUINELY user-set at save time (from P1.M4.T1.S1), `tmux set-option -g \"status-format[$n]\" \"$value\"`. (In this env: just the -gu.)\n   - status: `tmux set-option -g status \"$ORIG_STATUS\"` (restore line count, e.g. back to `on`/1).\n   - key-table: `tmux set-option key-table \"$ORIG_KEY_TABLE\"` (typically root).\n   - renumber-windows: `tmux set-option -g renumber-windows \"$ORIG_RENUMBER\"`.\n   - hook: if @livepicker-suppress-window-hook==on: replay every saved `show-hooks` line. For each saved line `session-window-changed[N] <cmd>`: `tmux set-hook -g session-window-changed \"<cmd>\"` (preserving -b). If nothing was saved, `set-hook -gu session-window-changed` (leave unset).\n4. OUTPUT: All global options + hook byte-identical to pre-activation (assertable by diffing show-options/show-hooks before vs after).\n5. MOCKING: Test under shim: snapshot show-options -g + show-hooks -g before activate; activate; restore cancel; assert the snapshot diffs to nothing.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.9",
+                    "h2.10",
+                    "h2.7/h3.11",
+                    "h2.16",
+                    "h2.14"
+                  ]
                 }
               ]
             },
@@ -350,9 +474,17 @@
                   "title": "restore.sh: select-layout ORIG_LAYOUT + clear_all_state + unbind livepicker",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M5.T3.S1", "P1.M1.T3.S1"],
-                  "prd_selectors": ["h2.9", "h2.15/h3.21", "h2.16", "h2.5/h3.2"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: select-layout to a saved window_layout string restores the exact pane geometry (PRD §9 step 5). The livepicker table must be unbound so no stale bindings linger; clear_all_state (state.sh P1.M1.T3.S1) clears OPTIONS only, so key unbinding is done here.\n2. INPUT: @livepicker-orig-layout, @livepicker-orig-window, state.clear_all_state.\n3. LOGIC (PRD §9 restore steps 5-6):\n   - `tmux select-window -t \"$ORIG_WINDOW\"` (ensure target window is active for layout apply).\n   - `tmux select-layout \"$ORIG_LAYOUT\"` (exact pane restore). Guard failure (layout may be invalid if windows changed) — best-effort, do not block exit.\n   - `tmux unbind-key -T livepicker` is not a single command; iterate `tmux list-keys -T livepicker` and unbind each key, OR `tmux kill-key-table livepicker` if available on 3.6b (verify; if not, loop unbind).\n   - Call state.clear_all_state to unset every @livepicker-* option.\n   - Final `tmux refresh-client -S` so the restored status draws.\n4. OUTPUT: Original pane layout restored; zero @livepicker-* options remain (`tmux show-options -g | grep livepicker` empty); livepicker table gone.\n5. MOCKING: Test under shim with a 3-pane window: capture layout, activate+nav (which links other windows), restore, assert `#{window_layout}` matches the pre-activation layout byte-for-byte and no @livepicker-* options remain.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M5.T3.S1",
+                    "P1.M1.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: select-layout to a saved window_layout string restores the exact pane geometry (PRD §9 step 5). The livepicker table must be unbound so no stale bindings linger; clear_all_state (state.sh P1.M1.T3.S1) clears OPTIONS only, so key unbinding is done here.\n2. INPUT: @livepicker-orig-layout, @livepicker-orig-window, state.clear_all_state.\n3. LOGIC (PRD §9 restore steps 5-6):\n   - `tmux select-window -t \"$ORIG_WINDOW\"` (ensure target window is active for layout apply).\n   - `tmux select-layout \"$ORIG_LAYOUT\"` (exact pane restore). Guard failure (layout may be invalid if windows changed) — best-effort, do not block exit.\n   - `tmux unbind-key -T livepicker` is not a single command; iterate `tmux list-keys -T livepicker` and unbind each key, OR `tmux kill-key-table livepicker` if available on 3.6b (verify; if not, loop unbind).\n   - Call state.clear_all_state to unset every @livepicker-* option.\n   - Final `tmux refresh-client -S` so the restored status draws.\n4. OUTPUT: Original pane layout restored; zero @livepicker-* options remain (`tmux show-options -g | grep livepicker` empty); livepicker table gone.\n5. MOCKING: Test under shim with a 3-pane window: capture layout, activate+nav (which links other windows), restore, assert `#{window_layout}` matches the pre-activation layout byte-for-byte and no @livepicker-* options remain.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.9",
+                    "h2.15/h3.21",
+                    "h2.16",
+                    "h2.5/h3.2"
+                  ]
                 }
               ]
             }
@@ -378,9 +510,17 @@
                   "title": "input-handler.sh type <char>",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T3.S1", "P1.M2.T1.S1"],
-                  "prd_selectors": ["h2.6/h3.4", "h2.5/h3.2", "h2.10", "h2.11"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: The renderer (P1.M2.T1.S1) does the actual filtering from @livepicker-list + @livepicker-filter; the handler only updates the filter/index state and forces a redraw via refresh-client -S (PRD §6 Filtering, §10). refresh-client -S re-runs #() commands (tmux_primitives.md §3).\n2. INPUT: argv[1]='type', argv[2]=the character. Reads/writes @livepicker-filter, @livepicker-index.\n3. LOGIC (PRD §6 Filtering): new_filter = old_filter + char. Set @livepicker-filter=new_filter. Reset @livepicker-index=0 (top match of the filtered list — the renderer highlights index 0). `tmux refresh-client -S`. (Filtering is case-insensitive at render time; the handler stores the raw typed query.)\n4. OUTPUT: filter extended; index at top match; status redrawn within ~100ms.\n5. MOCKING: Test under shim: set a known list, type 'log' char-by-char, assert @livepicker-filter=='log' and index==0 after each, and that the renderer output (run renderer.sh) reflects the filtered set.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M1.T3.S1",
+                    "P1.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: The renderer (P1.M2.T1.S1) does the actual filtering from @livepicker-list + @livepicker-filter; the handler only updates the filter/index state and forces a redraw via refresh-client -S (PRD §6 Filtering, §10). refresh-client -S re-runs #() commands (tmux_primitives.md §3).\n2. INPUT: argv[1]='type', argv[2]=the character. Reads/writes @livepicker-filter, @livepicker-index.\n3. LOGIC (PRD §6 Filtering): new_filter = old_filter + char. Set @livepicker-filter=new_filter. Reset @livepicker-index=0 (top match of the filtered list — the renderer highlights index 0). `tmux refresh-client -S`. (Filtering is case-insensitive at render time; the handler stores the raw typed query.)\n4. OUTPUT: filter extended; index at top match; status redrawn within ~100ms.\n5. MOCKING: Test under shim: set a known list, type 'log' char-by-char, assert @livepicker-filter=='log' and index==0 after each, and that the renderer output (run renderer.sh) reflects the filtered set.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.4",
+                    "h2.5/h3.2",
+                    "h2.10",
+                    "h2.11"
+                  ]
                 }
               ]
             },
@@ -397,9 +537,18 @@
                   "title": "input-handler.sh backspace / next-session / prev-session",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M6.T1.S1", "P1.M3.T1.S2"],
-                  "prd_selectors": ["h2.6/h3.4", "h2.6/h3.5", "h2.7", "h2.5/h3.2", "h2.11"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: next/prev MUST NOT call switch-client (PRD §6 Session navigation; Invariant A). They move the index within the FILTERED list and call preview.sh to swap the linked window. The filtered-list length must be computed identically to the renderer (case-insensitive substring) so the index stays in range. Wrap modulo length (PRD §6 'wrapping').\n2. INPUT: argv[1] in {backspace, next-session, prev-session}. Reads @livepicker-filter, @livepicker-list, @livepicker-index.\n3. LOGIC:\n   - backspace: new_filter = old_filter with last char removed (guard empty). Set filter. Set index=0. refresh-client -S.\n   - next-session: compute filtered length L (same filter logic as renderer). If L==0, no-op. Else index=(index+1)%L. Call `\"$SCRIPT_DIR/scripts/preview.sh\" \"<filtered[index]>\"`. refresh-client -S.\n   - prev-session: index=(index-1+L)%L. preview + refresh.\n   The filtered[index] resolution (name at the index in the filtered list) must match the renderer's ordering exactly — share a single filter function (put it in utils.sh or a tiny sourced helper to avoid drift).\n4. OUTPUT: filter/index updated; preview swapped to the newly highlighted session; status redrawn.\n5. MOCKING: Test under shim: type a filter yielding 3 matches, press next 3 times (wraps to start), assert the previewed session cycles correctly and client-session-changed never fires.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M6.T1.S1",
+                    "P1.M3.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: next/prev MUST NOT call switch-client (PRD §6 Session navigation; Invariant A). They move the index within the FILTERED list and call preview.sh to swap the linked window. The filtered-list length must be computed identically to the renderer (case-insensitive substring) so the index stays in range. Wrap modulo length (PRD §6 'wrapping').\n2. INPUT: argv[1] in {backspace, next-session, prev-session}. Reads @livepicker-filter, @livepicker-list, @livepicker-index.\n3. LOGIC:\n   - backspace: new_filter = old_filter with last char removed (guard empty). Set filter. Set index=0. refresh-client -S.\n   - next-session: compute filtered length L (same filter logic as renderer). If L==0, no-op. Else index=(index+1)%L. Call `\"$SCRIPT_DIR/scripts/preview.sh\" \"<filtered[index]>\"`. refresh-client -S.\n   - prev-session: index=(index-1+L)%L. preview + refresh.\n   The filtered[index] resolution (name at the index in the filtered list) must match the renderer's ordering exactly — share a single filter function (put it in utils.sh or a tiny sourced helper to avoid drift).\n4. OUTPUT: filter/index updated; preview swapped to the newly highlighted session; status redrawn.\n5. MOCKING: Test under shim: type a filter yielding 3 matches, press next 3 times (wraps to start), assert the previewed session cycles correctly and client-session-changed never fires.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.4",
+                    "h2.6/h3.5",
+                    "h2.7",
+                    "h2.5/h3.2",
+                    "h2.11"
+                  ]
                 }
               ]
             },
@@ -416,9 +565,22 @@
                   "title": "input-handler.sh confirm",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M5.T1.S1", "P1.M5.T2.S1", "P1.M5.T3.S1", "P1.M5.T4.S1", "P1.M6.T2.S1"],
-                  "prd_selectors": ["h2.6/h3.6", "h2.9", "h2.11", "h2.13", "h2.14", "h2.15/h3.22"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant A): this issues the ONLY switch-client in the whole flow (PRD §4/§14). switch-client -t '=target' exact-match. client-session-changed fires ONCE → tmux-session-history records exactly one navigation (forward collapses, target appends at tip), same as a sessionx jump — correct browser-like behavior. In WINDOW mode no switch-client and no creation (PRD §6 Confirm). new-session -d -s creates detached; on invalid name it fails → cancel (PRD §6).\n2. INPUT: @livepicker-filter, @livepicker-list, @livepicker-index, @livepicker-type, @livepicker-create. restore.sh (P1.M5).\n3. LOGIC (PRD §6 Confirm):\n   - Compute filtered list; target = filtered[index] if non-empty.\n   - If target present:\n     * type==session: `tmux switch-client -t \"=target\"`.\n     * type==window: parse 'session:window' from target; `tmux select-window -t \"session:window\"` (no switch-client, no creation).\n   - If filtered empty:\n     * type==session AND @livepicker-create==on: `tmux new-session -d -s \"$query\"`; if it succeeded, `tmux switch-client -t \"=$query\"`; if it failed (invalid name), fall through to cancel (call restore.sh cancel) and return.\n     * otherwise (window mode, or create off): no-op target — call restore cancel.\n   - After a successful target resolve/creation: call `\"$SCRIPT_DIR/scripts/restore.sh\" keep` (tears down picker but LEAVES the client on the chosen target — restore keep does NOT switch, P1.M5.T2.S1).\n4. OUTPUT: client on chosen target with exactly one session switch; picker fully torn down by restore keep.\n5. MOCKING: Test clusters: (a) confirm on a match lands there + one history entry; (b) empty+session+create on → session created and active; (c) empty+create off → nothing created; (d) window mode → no creation; (e) invalid name → cancels.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M5.T1.S1",
+                    "P1.M5.T2.S1",
+                    "P1.M5.T3.S1",
+                    "P1.M5.T4.S1",
+                    "P1.M6.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant A): this issues the ONLY switch-client in the whole flow (PRD §4/§14). switch-client -t '=target' exact-match. client-session-changed fires ONCE → tmux-session-history records exactly one navigation (forward collapses, target appends at tip), same as a sessionx jump — correct browser-like behavior. In WINDOW mode no switch-client and no creation (PRD §6 Confirm). new-session -d -s creates detached; on invalid name it fails → cancel (PRD §6).\n2. INPUT: @livepicker-filter, @livepicker-list, @livepicker-index, @livepicker-type, @livepicker-create. restore.sh (P1.M5).\n3. LOGIC (PRD §6 Confirm):\n   - Compute filtered list; target = filtered[index] if non-empty.\n   - If target present:\n     * type==session: `tmux switch-client -t \"=target\"`.\n     * type==window: parse 'session:window' from target; `tmux select-window -t \"session:window\"` (no switch-client, no creation).\n   - If filtered empty:\n     * type==session AND @livepicker-create==on: `tmux new-session -d -s \"$query\"`; if it succeeded, `tmux switch-client -t \"=$query\"`; if it failed (invalid name), fall through to cancel (call restore.sh cancel) and return.\n     * otherwise (window mode, or create off): no-op target — call restore cancel.\n   - After a successful target resolve/creation: call `\"$SCRIPT_DIR/scripts/restore.sh\" keep` (tears down picker but LEAVES the client on the chosen target — restore keep does NOT switch, P1.M5.T2.S1).\n4. OUTPUT: client on chosen target with exactly one session switch; picker fully torn down by restore keep.\n5. MOCKING: Test clusters: (a) confirm on a match lands there + one history entry; (b) empty+session+create on → session created and active; (c) empty+create off → nothing created; (d) window mode → no creation; (e) invalid name → cancels.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.6",
+                    "h2.9",
+                    "h2.11",
+                    "h2.13",
+                    "h2.14",
+                    "h2.15/h3.22"
+                  ]
                 }
               ]
             },
@@ -435,9 +597,15 @@
                   "title": "input-handler.sh cancel",
                   "status": "Planned",
                   "story_points": 0.5,
-                  "dependencies": ["P1.M5.T4.S1"],
-                  "prd_selectors": ["h2.6/h3.7", "h2.9", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: cancel must produce ZERO net session-history pollution (Invariant A). Per PRD §11, the cancel key 'clears the query, or cancels if the query is empty' — implement that two-step semantics: first press of cancel with a non-empty filter clears the filter (like backspace-to-empty); only when the filter is already empty does it fully cancel. This is a small but important UX detail.\n2. INPUT: @livepicker-filter; restore.sh.\n3. LOGIC:\n   - If @livepicker-filter non-empty: set @livepicker-filter='' , @livepicker-index=0, refresh-client -S, return (clear query, do NOT exit picker).\n   - Else: call `\"$SCRIPT_DIR/scripts/restore.sh\" cancel` (full teardown + switch-client back to ORIG_SESSION).\n4. OUTPUT: either query cleared (picker stays open) or full cancel (client back where it started, zero history entries).\n5. MOCKING: Test under shim: type a filter, press cancel once (filter clears, picker open), press cancel again (picker exits, client on original session, history unchanged).\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M5.T4.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: cancel must produce ZERO net session-history pollution (Invariant A). Per PRD §11, the cancel key 'clears the query, or cancels if the query is empty' — implement that two-step semantics: first press of cancel with a non-empty filter clears the filter (like backspace-to-empty); only when the filter is already empty does it fully cancel. This is a small but important UX detail.\n2. INPUT: @livepicker-filter; restore.sh.\n3. LOGIC:\n   - If @livepicker-filter non-empty: set @livepicker-filter='' , @livepicker-index=0, refresh-client -S, return (clear query, do NOT exit picker).\n   - Else: call `\"$SCRIPT_DIR/scripts/restore.sh\" cancel` (full teardown + switch-client back to ORIG_SESSION).\n4. OUTPUT: either query cleared (picker stays open) or full cancel (client back where it started, zero history entries).\n5. MOCKING: Test under shim: type a filter, press cancel once (filter clears, picker open), press cancel again (picker exits, client on original session, history unchanged).\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.6/h3.7",
+                    "h2.9",
+                    "h2.14"
+                  ]
                 }
               ]
             }
@@ -464,8 +632,11 @@
                   "status": "Planned",
                   "story_points": 2,
                   "dependencies": [],
-                  "prd_selectors": ["h2.15", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (CRITICAL — system_context.md §7): NO sibling plugin has a socket-isolation harness. PRD §15's 'as in the session-history test' references a pattern that does NOT exist there. resurrect uses Vagrant+expect with a real kill-server (too heavy, not isolated). This subtask INVENTS the shim. Plugin scripts call bare `tmux`; a PATH shim lets those calls hit an isolated `tmux -L` socket without code changes.\n2. INPUT: none.\n3. LOGIC: Create a temp dir, write an executable `tmux` wrapper: `#!/usr/bin/env bash; exec /usr/bin/tmux -L \"$TEST_SOCKET\" \"$@\"` (hardcode the real tmux path, NOT recursive). chmod +x. export PATH=\"<tmpdir>:$PATH\". export TEST_SOCKET. Start an isolated server: the wrapper `tmux new-session -d -s driver`. Provide setup() and teardown() functions: setup creates the shim+server+spawns a few test sessions/windows/panes; teardown runs `tmux kill-server` (hits the isolated socket via PATH) and `rm -rf` the temp dir. Confirm the real user server is untouched by checking its socket differs.\n4. OUTPUT: tests/setup_socket.sh providing setup_socket/teardown_socket; every subsequent test sources it and gets an isolated `tmux`.\n5. MOCKING: This IS the mocking infra. Self-test: run setup, assert `tmux list-sessions` shows only the test sessions, assert the real server (via /usr/bin/tmux directly) is unchanged, run teardown, assert the socket is gone.\n6. DOCS: Mode A — none (test infra)."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (CRITICAL — system_context.md §7): NO sibling plugin has a socket-isolation harness. PRD §15's 'as in the session-history test' references a pattern that does NOT exist there. resurrect uses Vagrant+expect with a real kill-server (too heavy, not isolated). This subtask INVENTS the shim. Plugin scripts call bare `tmux`; a PATH shim lets those calls hit an isolated `tmux -L` socket without code changes.\n2. INPUT: none.\n3. LOGIC: Create a temp dir, write an executable `tmux` wrapper: `#!/usr/bin/env bash; exec /usr/bin/tmux -L \"$TEST_SOCKET\" \"$@\"` (hardcode the real tmux path, NOT recursive). chmod +x. export PATH=\"<tmpdir>:$PATH\". export TEST_SOCKET. Start an isolated server: the wrapper `tmux new-session -d -s driver`. Provide setup() and teardown() functions: setup creates the shim+server+spawns a few test sessions/windows/panes; teardown runs `tmux kill-server` (hits the isolated socket via PATH) and `rm -rf` the temp dir. Confirm the real user server is untouched by checking its socket differs.\n4. OUTPUT: tests/setup_socket.sh providing setup_socket/teardown_socket; every subsequent test sources it and gets an isolated `tmux`.\n5. MOCKING: This IS the mocking infra. Self-test: run setup, assert `tmux list-sessions` shows only the test sessions, assert the real server (via /usr/bin/tmux directly) is unchanged, run teardown, assert the socket is gone.\n6. DOCS: Mode A — none (test infra).",
+                  "prd_selectors": [
+                    "h2.15",
+                    "h2.16"
+                  ]
                 }
               ]
             },
@@ -482,9 +653,13 @@
                   "title": "tests/helpers.sh + tests/run.sh",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M7.T1.S1"],
-                  "prd_selectors": ["h2.15"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Borrow resurrect's helper idioms (system_context.md §7): fail_helper sets TEST_STATUS=fail, teardown_helper kills the isolated server + cleans tmp, exit_helper returns non-zero on fail. Test functions named test_*; discovered via `compgen -A function | grep '^test_'` or by sourcing every tests/test_*.sh and iterating.\n2. INPUT: setup_socket.sh (P1.M7.T1.S1).\n3. LOGIC: helpers.sh — `assert_eq a b msg`, `assert_contains str sub msg`, `fail msg`, `pass msg`, `setup_test` (calls setup_socket + seeds fixtures), `teardown_test` (teardown_socket). run.sh — sources setup_socket.sh + helpers.sh + every tests/test_*.sh, runs setup_test once, iterates test_* functions (each gets its own fresh fixture via per-test setup/teardown), prints pass/fail per test, exits non-zero if any failed.\n4. OUTPUT: `bash tests/run.sh` runs the whole suite against an isolated socket and exits 0/1.\n5. MOCKING: Self-test: a trivial test_true passes and a test_false fails, runner exit code reflects it.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M7.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Borrow resurrect's helper idioms (system_context.md §7): fail_helper sets TEST_STATUS=fail, teardown_helper kills the isolated server + cleans tmp, exit_helper returns non-zero on fail. Test functions named test_*; discovered via `compgen -A function | grep '^test_'` or by sourcing every tests/test_*.sh and iterating.\n2. INPUT: setup_socket.sh (P1.M7.T1.S1).\n3. LOGIC: helpers.sh — `assert_eq a b msg`, `assert_contains str sub msg`, `fail msg`, `pass msg`, `setup_test` (calls setup_socket + seeds fixtures), `teardown_test` (teardown_socket). run.sh — sources setup_socket.sh + helpers.sh + every tests/test_*.sh, runs setup_test once, iterates test_* functions (each gets its own fresh fixture via per-test setup/teardown), prints pass/fail per test, exits non-zero if any failed.\n4. OUTPUT: `bash tests/run.sh` runs the whole suite against an isolated socket and exits 0/1.\n5. MOCKING: Self-test: a trivial test_true passes and a test_false fails, runner exit code reflects it.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.15"
+                  ]
                 }
               ]
             },
@@ -501,9 +676,17 @@
                   "title": "tests/test_functional.sh",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M7.T2.S1", "P1.M4.T5.S1", "P1.M6.T4.S1"],
-                  "prd_selectors": ["h2.15/h3.17", "h2.6", "h2.3"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Drive activation by calling scripts/livepicker.sh directly (not via keypress) in the isolated server; assert observable tmux state. Filter by reading renderer.sh output. Navigation by calling input-handler.sh next/prev. Confirm/cancel likewise. status==2 and key-table==livepicker are the activation signals.\n2. INPUT: full plugin (P1.M1–P1.M6), helpers (P1.M7.T2.S1).\n3. LOGIC — test functions covering PRD §15.17:\n   - test_activate_grows_status: after activate, `show-options -gv status`==2, status-format[0] contains renderer.sh, key-table==livepicker, @livepicker-mode==on.\n   - test_typing_filters: type 'log' char by char, run renderer.sh, assert only matching sessions appear and the highlight index is 0.\n   - test_nav_moves_selection: next-session cycles the filtered list; preview.sh was called for each (assert @livepicker-linked-id changed to each target's window id).\n   - test_confirm_lands: confirm on a target, assert client's session == target and picker torn down (no @livepicker-*).\n   - test_escape_restores: cancel, assert client back on original session/window and status==orig.\n4. OUTPUT: pass/fail per function; runner aggregates.\n5. MOCKING: All against the isolated socket; real server untouched.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M7.T2.S1",
+                    "P1.M4.T5.S1",
+                    "P1.M6.T4.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Drive activation by calling scripts/livepicker.sh directly (not via keypress) in the isolated server; assert observable tmux state. Filter by reading renderer.sh output. Navigation by calling input-handler.sh next/prev. Confirm/cancel likewise. status==2 and key-table==livepicker are the activation signals.\n2. INPUT: full plugin (P1.M1–P1.M6), helpers (P1.M7.T2.S1).\n3. LOGIC — test functions covering PRD §15.17:\n   - test_activate_grows_status: after activate, `show-options -gv status`==2, status-format[0] contains renderer.sh, key-table==livepicker, @livepicker-mode==on.\n   - test_typing_filters: type 'log' char by char, run renderer.sh, assert only matching sessions appear and the highlight index is 0.\n   - test_nav_moves_selection: next-session cycles the filtered list; preview.sh was called for each (assert @livepicker-linked-id changed to each target's window id).\n   - test_confirm_lands: confirm on a target, assert client's session == target and picker torn down (no @livepicker-*).\n   - test_escape_restores: cancel, assert client back on original session/window and status==orig.\n4. OUTPUT: pass/fail per function; runner aggregates.\n5. MOCKING: All against the isolated socket; real server untouched.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.15/h3.17",
+                    "h2.6",
+                    "h2.3"
+                  ]
                 }
               ]
             },
@@ -520,9 +703,17 @@
                   "title": "tests/test_preview.sh",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M7.T2.S1", "P1.M3.T1.S2"],
-                  "prd_selectors": ["h2.15/h3.19", "h2.7", "h2.13", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: A linked window is the SAME window object (same id) in both sessions; all its panes render live. list-windows -t '=S' before and after must show the window id still present in S (unlink only removed it from the driver session). Self-session must NOT attempt link (would error).\n2. INPUT: preview.sh, helpers.\n3. LOGIC — test functions covering PRD §15.19:\n   - test_multipane_preview: create session S with a 3-pane active window; preview.sh S; assert the linked window id appears in the driver session AND `tmux list-windows -t '=S'` still lists it; assert the driver's current window id == S's active window id (all panes visible).\n   - test_navigate_unlinks_intact: preview S (linked), then preview S2; assert S's window id no longer in driver session but STILL in S (list-windows before/after diff).\n   - test_self_session_no_link: preview the driver's own session; assert @livepicker-linked-id stays empty and no link-window was attempted (the original window is selected).\n   - test_capture_fallback: force a link failure (e.g. preview a session whose active window is already linked singly) and assert capture-pane path runs without error.\n4. OUTPUT: pass/fail per function.\n5. MOCKING: isolated socket with crafted multi-session/multi-pane fixtures.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M7.T2.S1",
+                    "P1.M3.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: A linked window is the SAME window object (same id) in both sessions; all its panes render live. list-windows -t '=S' before and after must show the window id still present in S (unlink only removed it from the driver session). Self-session must NOT attempt link (would error).\n2. INPUT: preview.sh, helpers.\n3. LOGIC — test functions covering PRD §15.19:\n   - test_multipane_preview: create session S with a 3-pane active window; preview.sh S; assert the linked window id appears in the driver session AND `tmux list-windows -t '=S'` still lists it; assert the driver's current window id == S's active window id (all panes visible).\n   - test_navigate_unlinks_intact: preview S (linked), then preview S2; assert S's window id no longer in driver session but STILL in S (list-windows before/after diff).\n   - test_self_session_no_link: preview the driver's own session; assert @livepicker-linked-id stays empty and no link-window was attempted (the original window is selected).\n   - test_capture_fallback: force a link failure (e.g. preview a session whose active window is already linked singly) and assert capture-pane path runs without error.\n4. OUTPUT: pass/fail per function.\n5. MOCKING: isolated socket with crafted multi-session/multi-pane fixtures.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.15/h3.19",
+                    "h2.7",
+                    "h2.13",
+                    "h2.16"
+                  ]
                 }
               ]
             },
@@ -539,9 +730,19 @@
                   "title": "tests/test_pollution.sh",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M7.T2.S1", "P1.M6.T3.S1", "P1.M6.T4.S1"],
-                  "prd_selectors": ["h2.15/h3.18", "h2.4", "h2.14", "h2.5", "h2.6"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant A, system_context.md §3/§6): tmux-session-history is driven by client-session-changed; browsing fires only session-window-changed (suppressed anyway). History is newline-separated in @session-history-hist. The test must install a minimal session-history stand-in on the isolated socket (a set-hook client-session-changed that appends to @test-hist) since the real plugin isn't loaded there — OR load the real tmux-session-history plugin into the isolated server. Recommend the stand-in for determinism.\n2. INPUT: full plugin + helpers + a client-session-changed recorder.\n3. LOGIC — test functions covering PRD §15.18:\n   - test_browse_cancel_no_pollution: snapshot @test-hist; activate; navigate 5 sessions; cancel; assert @test-hist unchanged AND the client's session == original.\n   - test_browse_confirm_one_entry: snapshot @test-hist; activate; navigate 5; confirm on the 5th; assert exactly ONE new entry appended (the target) and forward history collapsed (no intermediate sessions recorded).\n   - test_toggle_after_confirm: after a confirmed pick, simulate the session-history toggle (read @session-history-prev / call the toggle) and assert it returns to the pre-pick session.\n4. OUTPUT: pass/fail; these tests are the proof of PRD §4.\n5. MOCKING: isolated socket + a client-session-changed hook that maintains @test-hist mirroring session-history's dedup/collapse semantics.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M7.T2.S1",
+                    "P1.M6.T3.S1",
+                    "P1.M6.T4.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (VERIFIED — Invariant A, system_context.md §3/§6): tmux-session-history is driven by client-session-changed; browsing fires only session-window-changed (suppressed anyway). History is newline-separated in @session-history-hist. The test must install a minimal session-history stand-in on the isolated socket (a set-hook client-session-changed that appends to @test-hist) since the real plugin isn't loaded there — OR load the real tmux-session-history plugin into the isolated server. Recommend the stand-in for determinism.\n2. INPUT: full plugin + helpers + a client-session-changed recorder.\n3. LOGIC — test functions covering PRD §15.18:\n   - test_browse_cancel_no_pollution: snapshot @test-hist; activate; navigate 5 sessions; cancel; assert @test-hist unchanged AND the client's session == original.\n   - test_browse_confirm_one_entry: snapshot @test-hist; activate; navigate 5; confirm on the 5th; assert exactly ONE new entry appended (the target) and forward history collapsed (no intermediate sessions recorded).\n   - test_toggle_after_confirm: after a confirmed pick, simulate the session-history toggle (read @session-history-prev / call the toggle) and assert it returns to the pre-pick session.\n4. OUTPUT: pass/fail; these tests are the proof of PRD §4.\n5. MOCKING: isolated socket + a client-session-changed hook that maintains @test-hist mirroring session-history's dedup/collapse semantics.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.15/h3.18",
+                    "h2.4",
+                    "h2.14",
+                    "h2.5",
+                    "h2.6"
+                  ]
                 }
               ]
             },
@@ -558,9 +759,21 @@
                   "title": "tests/test_restore.sh + test_keyrepurpose.sh + test_create.sh",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M7.T2.S1", "P1.M6.T3.S1", "P1.M6.T4.S1"],
-                  "prd_selectors": ["h2.15/h3.20", "h2.15/h3.21", "h2.15/h3.22", "h2.8", "h2.9", "h2.11", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: restoration must be byte-exact for status, every status-format index, key-table, renumber-windows, and the session-window-changed hook (including -b). The livepicker table must be gone and no @livepicker-* options may remain. Key repurpose: C-M-Tab/C-M-BTab are bound in livepicker during the picker and revert to root after (key-table restore). Create-on-enter per PRD §6/§11.\n2. INPUT: full plugin + helpers.\n3. LOGIC — test functions covering PRD §15.20–22:\n   - Restore (§15.20/21): snapshot `show-options -g` + `show-hooks -g` + `#{window_layout}` before activate; activate; nav; cancel; assert each snapshot field is byte-identical after; assert `show-options -g | grep livepicker` is empty; assert `list-keys -T livepicker` is empty (table unbound); assert pane layout matches.\n   - Key repurpose (§15.20): during picker, the C-M-Tab binding resolves to input-handler next-session (assert via list-keys -T livepicker); after exit, C-M-Tab is back in root as swap-window;select-window (assert via list-keys -T root).\n   - Create-on-enter (§15.22): session mode + create on + no match + Enter → new session exists and is active; create off → nothing created; window mode → nothing created.\n4. OUTPUT: pass/fail per function.\n5. MOCKING: isolated socket.\n6. DOCS: Mode A — none."
+                  "dependencies": [
+                    "P1.M7.T2.S1",
+                    "P1.M6.T3.S1",
+                    "P1.M6.T4.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: restoration must be byte-exact for status, every status-format index, key-table, renumber-windows, and the session-window-changed hook (including -b). The livepicker table must be gone and no @livepicker-* options may remain. Key repurpose: C-M-Tab/C-M-BTab are bound in livepicker during the picker and revert to root after (key-table restore). Create-on-enter per PRD §6/§11.\n2. INPUT: full plugin + helpers.\n3. LOGIC — test functions covering PRD §15.20–22:\n   - Restore (§15.20/21): snapshot `show-options -g` + `show-hooks -g` + `#{window_layout}` before activate; activate; nav; cancel; assert each snapshot field is byte-identical after; assert `show-options -g | grep livepicker` is empty; assert `list-keys -T livepicker` is empty (table unbound); assert pane layout matches.\n   - Key repurpose (§15.20): during picker, the C-M-Tab binding resolves to input-handler next-session (assert via list-keys -T livepicker); after exit, C-M-Tab is back in root as swap-window;select-window (assert via list-keys -T root).\n   - Create-on-enter (§15.22): session mode + create on + no match + Enter → new session exists and is active; create off → nothing created; window mode → nothing created.\n4. OUTPUT: pass/fail per function.\n5. MOCKING: isolated socket.\n6. DOCS: Mode A — none.",
+                  "prd_selectors": [
+                    "h2.15/h3.20",
+                    "h2.15/h3.21",
+                    "h2.15/h3.22",
+                    "h2.8",
+                    "h2.9",
+                    "h2.11",
+                    "h2.16"
+                  ]
                 }
               ]
             }
@@ -586,9 +799,28 @@
                   "title": "README.md — overview, install, config table, usage, compatibility",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S1", "P1.M1.T4.S1", "P1.M2.T1.S1", "P1.M3.T1.S2", "P1.M4.T5.S1", "P1.M5.T4.S1", "P1.M6.T3.S1", "P1.M6.T4.S1", "P1.M7.T6.S1"],
-                  "prd_selectors": ["h1.0", "h2.1", "h2.2", "h2.3", "h2.11", "h2.12", "h2.14", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This is the Mode B catch-all (SOW §5). It depends on EVERY implementing subtask so it runs last and reflects the shipped behavior. Sibling README conventions: session-history/sessionx READMEs are concise (what/install/options/usage). The user loads plugins via either TPM @plugin or run-shell (system_context.md §2) — document the run-shell line for plugin.tmux. Compatibility floor: document 3.2 (multi-line status) as the minimum, note 3.6b is the tested target (system_context.md §10). Do NOT modify PRD.md (read-only per SOW); PRD §0 'Prior attempt' removal is a human post-verification decision — note it as a recommendation in README or a CHANGELOG, do not edit PRD.md here.\n2. INPUT: the implemented plugin (all of P1.M1–P1.M7), the verified architecture findings in plan/001_fd5d622d3939/architecture/.\n3. LOGIC: Write README.md with sections: Overview (PRD §1), Goals/non-goals (§2), User stories (§3), Installation (TPM @plugin OR `run-shell ~/.config/tmux/plugins/tmux-livepicker/plugin.tmux`; note @livepicker-key must be set, default Space already pre-declared in the user's tmux.conf), Configuration (the full PRD §11 options table with defaults + descriptions), Usage (activate→filter→navigate→confirm/cancel; the prefix-table key flow), How it works (the link-window preview invariant, one-paragraph), Compatibility (tmux >=3.2; tested on 3.6b; composes with tmux-session-history/sessionx/resurrect/tubular), Validation (how to run `bash tests/run.sh`).\n4. OUTPUT: README.md at repo root.\n5. DOCS: This IS the docs task (Mode B).\n6. MOCKING: none."
+                  "dependencies": [
+                    "P1.M1.T1.S1",
+                    "P1.M1.T4.S1",
+                    "P1.M2.T1.S1",
+                    "P1.M3.T1.S2",
+                    "P1.M4.T5.S1",
+                    "P1.M5.T4.S1",
+                    "P1.M6.T3.S1",
+                    "P1.M6.T4.S1",
+                    "P1.M7.T6.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This is the Mode B catch-all (SOW §5). It depends on EVERY implementing subtask so it runs last and reflects the shipped behavior. Sibling README conventions: session-history/sessionx READMEs are concise (what/install/options/usage). The user loads plugins via either TPM @plugin or run-shell (system_context.md §2) — document the run-shell line for plugin.tmux. Compatibility floor: document 3.2 (multi-line status) as the minimum, note 3.6b is the tested target (system_context.md §10). Do NOT modify PRD.md (read-only per SOW); PRD §0 'Prior attempt' removal is a human post-verification decision — note it as a recommendation in README or a CHANGELOG, do not edit PRD.md here.\n2. INPUT: the implemented plugin (all of P1.M1–P1.M7), the verified architecture findings in plan/001_fd5d622d3939/architecture/.\n3. LOGIC: Write README.md with sections: Overview (PRD §1), Goals/non-goals (§2), User stories (§3), Installation (TPM @plugin OR `run-shell ~/.config/tmux/plugins/tmux-livepicker/plugin.tmux`; note @livepicker-key must be set, default Space already pre-declared in the user's tmux.conf), Configuration (the full PRD §11 options table with defaults + descriptions), Usage (activate→filter→navigate→confirm/cancel; the prefix-table key flow), How it works (the link-window preview invariant, one-paragraph), Compatibility (tmux >=3.2; tested on 3.6b; composes with tmux-session-history/sessionx/resurrect/tubular), Validation (how to run `bash tests/run.sh`).\n4. OUTPUT: README.md at repo root.\n5. DOCS: This IS the docs task (Mode B).\n6. MOCKING: none.",
+                  "prd_selectors": [
+                    "h1.0",
+                    "h2.1",
+                    "h2.2",
+                    "h2.3",
+                    "h2.11",
+                    "h2.12",
+                    "h2.14",
+                    "h2.16"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -596,9 +828,15 @@
                   "title": "CHANGELOG / version note + recommend PRD §0 removal",
                   "status": "Planned",
                   "story_points": 0.5,
-                  "dependencies": ["P1.M8.T1.S1"],
-                  "prd_selectors": ["h2.0", "h2.1", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §0 instructs removing the 'Prior attempt' section after implementation lands and is verified. SOW FORBIDDEN OPERATIONS explicitly forbids modifying PRD.md. Resolution: do NOT edit PRD.md; instead record the recommendation in a CHANGELOG.md entry and surface it in the README's validation section ('After verification, a human should remove PRD §0').\n2. INPUT: README.md (P1.M8.T1.S1), PRD §0.\n3. LOGIC: Create CHANGELOG.md (or a '## Notes for maintainers' README section) recording: initial implementation of tmux-livepicker per PRD; the three proven invariants (no client-session-changed while browsing; modal key-table; multi-line status composition); the documented floor correction (3.2 not 3.0); and the explicit recommendation that a human remove PRD §0 once the §15 validation suite passes on the real environment.\n4. OUTPUT: CHANGELOG.md (or README maintainers section).\n5. DOCS: This IS the docs task (Mode B).\n6. MOCKING: none."
+                  "dependencies": [
+                    "P1.M8.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §0 instructs removing the 'Prior attempt' section after implementation lands and is verified. SOW FORBIDDEN OPERATIONS explicitly forbids modifying PRD.md. Resolution: do NOT edit PRD.md; instead record the recommendation in a CHANGELOG.md entry and surface it in the README's validation section ('After verification, a human should remove PRD §0').\n2. INPUT: README.md (P1.M8.T1.S1), PRD §0.\n3. LOGIC: Create CHANGELOG.md (or a '## Notes for maintainers' README section) recording: initial implementation of tmux-livepicker per PRD; the three proven invariants (no client-session-changed while browsing; modal key-table; multi-line status composition); the documented floor correction (3.2 not 3.0); and the explicit recommendation that a human remove PRD §0 once the §15 validation suite passes on the real environment.\n4. OUTPUT: CHANGELOG.md (or README maintainers section).\n5. DOCS: This IS the docs task (Mode B).\n6. MOCKING: none.",
+                  "prd_selectors": [
+                    "h2.0",
+                    "h2.1",
+                    "h2.16"
+                  ]
                 }
               ]
             }

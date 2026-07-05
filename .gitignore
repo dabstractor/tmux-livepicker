@@ -1,0 +1,21 @@
+# --- Dependencies ---
+node_modules/
+venv/
+
+# --- Build artifacts ---
+dist/
+build/
+
+# --- Environment files ---
+.env
+.env.*
+
+# --- OS-specific files ---
+.DS_Store
+Thumbs.db
+
+# --- Local editor/agent settings (personal, not shared) ---
+.claude/settings.local.json
+
+# --- Agent runtime artifacts (transcripts, outputs, progress) ---
+.pi-subagents/
