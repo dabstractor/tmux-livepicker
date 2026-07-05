@@ -54,7 +54,7 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd
+	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd orig_layout
 
 	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
@@ -150,11 +150,42 @@ restore_main() {
 	# hook, so the live hook is still the user's original -> restore does nothing
 	# here (the if skips). Symmetric with activate T4.S2.
 
-	# --- T4 (P1.M5.T4.S1): select-layout ORIG_LAYOUT + clear_all_state +
-	#     unbind-key -T livepicker (insert here) ---
-	# PRD §9 restore steps 5-6. select-layout "$ORIG_LAYOUT"; clear_all_state
-	# (state.sh — clears the 5 runtime keys + every @livepicker-orig-*); then
-	# tmux unbind-key -T livepicker <each> (or unbind-key -aT livepicker).
+	# --- STEP 5 (PRD §9 restore step 5): restore the original pane layout ---
+	# select-layout applies to the ACTIVE window. STEP 2 (T1.S1) already ran
+	# `select-window -t "$ORIG_WINDOW"` above, so the target window is active —
+	# T4 does NOT re-select-window (FINDING 7). ORIG_LAYOUT is the EXACT
+	# #{window_layout} string activate STEP 2 saved (e.g.
+	# "e79b,120x40,0,0[120x20,0,0,0,...]"); feed it back UNCHANGED (byte-identical
+	# round-trip — FINDING 1). BEST-EFFORT (FINDING 2): an invalid/vanished/empty
+	# layout returns rc=1 and MUST NOT block the teardown. Guard on non-empty
+	# first (defensive — get_state defaults to "" if activate failed mid-save),
+	# then `2>/dev/null || true` on the call.
+	orig_layout="$(get_state "$ORIG_LAYOUT" "")"
+	[ -n "$orig_layout" ] && tmux select-layout "$orig_layout" 2>/dev/null || true
+
+	# --- STEP 6 (PRD §9 restore step 6): clear picker state + unbind the table ---
+	# (a) clear_all_state (state.sh — ALREADY COMPLETE, P1.M1.T3.S1) unsets the 5
+	#     runtime @livepicker-* keys ($STATE_MODE/$STATE_LIST/$STATE_FILTER/
+	#     $STATE_INDEX/$STATE_LINKED_ID) AND every @livepicker-orig-* saved-state
+	#     key (incl. ORIG_LAYOUT, just read above — so this MUST run AFTER the
+	#     select-layout read: FINDING 8). It PRESERVES PRD §11 config
+	#     (@livepicker-key/fg/type/...) — CORRECTION A in state.sh; the work-item's
+	#     literal "no @livepicker-* options remain" is TOO BROAD (CORRECTION 2) —
+	#     config must survive or the next activation breaks. Clears OPTIONS only;
+	#     the key-table teardown is (b) below.
+	# (b) unbind the livepicker key table activate T4.S1 built (~169 copied+explicit
+	#     keys). kill-key-table does NOT exist on tmux 3.6b (FINDING 3 ->
+	#     CORRECTION 1); use the BULK `unbind-key -a -T livepicker` (FINDING 4),
+	#     which atomically removes EVERY key. When the table is already empty
+	#     (double-restore / restore-without-activate) it rc=1 "table doesn't exist"
+	#     -> guarded (idempotent). After this list-keys -T livepicker rc=1 = gone.
+	# (c) refresh-client -S redraws the status so the restored status-format (T3)
+	#     draws (PRD §16: every input action must call refresh-client -S). Requires
+	#     a client (FINDING 5); production always has one (restore runs from a key
+	#     press); guard for the detached edge / mock.
+	clear_all_state
+	tmux unbind-key -a -T livepicker 2>/dev/null || true
+	tmux refresh-client -S 2>/dev/null || true
 
 	return 0
 }
