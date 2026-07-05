@@ -73,7 +73,46 @@ activate_main() {
 	# via get_state "$STATE_LINKED_ID" "" — empty means no prior link to unlink.
 	set_state "$STATE_LINKED_ID" ""
 
-	# --- T2 (P1.M4.T2.S1): build session list + initial selection (insert here) ---
+	# --- T2 (P1.M4.T2.S1): build session/window list + initial selection ---
+	# PRD §6 Activation step 3 (build the list) + step 6's initial-selection
+	# half (highlight lands on the user's own session/window; the first PREVIEW
+	# is P1.M4.T5.S1). Empty filter -> full list shown. Index is 0-based and
+	# points at the current session (or current session:window) in the FULL
+	# unfiltered list (renderer FINDING 4: empty filter matches all, so the
+	# index is valid for filtered==all too).
+	local pick_type current list idx i
+	local -a items=()
+	pick_type="$(opt_type)"                       # session | window (PRD §11; default session)
+	current="$(get_state "$ORIG_SESSION" "")"     # client-independent; saved by STEP 2
+	if [ "$pick_type" = "window" ]; then
+		# Window mode: session:window_index tokens across ALL sessions (PRD §11).
+		# The current token is the live session:window_index in the SAME format
+		# the list emits -> exact string match. ORIG_WINDOW is the @N id, NOT the
+		# index, so the index must come from display-message (client present at
+		# activation). (research FINDING 4/5)
+		list="$(tmux list-windows -a -F '#{session_name}:#{window_index}' 2>/dev/null)"
+		current="$(tmux display-message -p '#{session_name}:#{window_index}')"
+	else
+		# Session mode: one name per line, tmux default order (NO MRU — PRD §2
+		# non-goals). $() strips the trailing newline so the stored value has
+		# embedded \n but no trailing \n (renderer mapfile yields exactly N).
+		list="$(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
+	fi
+	# Resolve the 0-based index of `current` in the full list (default 0 if the
+	# current session/window vanished between save and list-build — a race; the
+	# renderer clamps anyway). PROCESS SUBSTITUTION (not a here-string) so an
+	# empty list is a truly empty array (renderer FINDING 3 / research FINDING 8).
+	mapfile -t items < <(printf '%s' "$list")
+	idx=0
+	for i in "${!items[@]}"; do
+		[ "${items[$i]}" = "$current" ] && { idx="$i"; break; }
+	done
+	# Store newline-joined list (verbatim $() output), empty filter (full list),
+	# and the resolved index. set_state -> tmux set-option -g preserves embedded
+	# newlines (research FINDING 3); renderer reads back exactly N entries.
+	set_state "$STATE_LIST" "$list"
+	set_state "$STATE_FILTER" ""
+	set_state "$STATE_INDEX" "$idx"
 	# --- T3 (P1.M4.T3.S1): grow status bar + install renderer (insert here) ---
 	# --- T4 (P1.M4.T4.S1/S2): switch key-table + bind keys + suppress hook (insert here) ---
 	# --- T5 (P1.M4.T5.S1): first preview + set @livepicker-mode on (insert here) ---
