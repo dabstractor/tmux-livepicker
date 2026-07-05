@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Foundation — options, utils, state, entry point",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Stand up the shared helper layer every other script depends on: the option/defaults module (PRD §11), safe tmux option helpers incl. an is-set probe (needed for the status-format save/restore trap), the @livepicker-* state module that defines the saved-state CONTRACT used by both activate (writer) and restore (reader), and the plugin.tmux entry point that binds the activation key in the prefix table.",
           "tasks": [
             {
@@ -91,14 +91,14 @@
               "type": "Task",
               "id": "P1.M1.T4",
               "title": "plugin.tmux — entry point, key binding, unset-guard",
-              "status": "Researching",
+              "status": "Complete",
               "description": "The TPM-loadable entry point that computes SCRIPT_DIR, reads @livepicker-key, and binds activation in the prefix table (NOT root, to avoid shadowing tubular's C-Space), guarding with a display-message if the key is unset.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T4.S1",
                   "title": "plugin.tmux: bind activation key (prefix table) + unset guard",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1"
@@ -118,21 +118,21 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Status-line picker renderer",
-          "status": "Planned",
+          "status": "Researching",
           "description": "The #() status command that draws the filtered session list with the highlighted selection, query, and count. Standalone-testable: set the @livepicker-* state options, invoke renderer.sh, assert the styled output.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "scripts/renderer.sh — filtered list + highlight + query + count",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Read @livepicker-list/filter/index/colors/show-count; filter case-insensitively by substring; highlight the item at the (filtered) index; emit a single tmux-format string suitable for status-format[0].",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "renderer.sh: filter, highlight, count, style emission",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1",
