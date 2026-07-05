@@ -54,7 +54,7 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session orig_session mode
+	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd
 
 	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
@@ -100,12 +100,55 @@ restore_main() {
 	fi
 	# keep: intentionally no else — doing nothing is the contract (FINDING D).
 
-	# --- T3 (P1.M5.T3.S1): restore status / status-format / key-table /
-	#     renumber-windows / session-window-changed hook (insert here) ---
-	# PRD §9 restore step 4. status-format via state_status_format_restore
-	# (TRAP 1: -gu reset then replay saved indices). key-table/renumber/status
-	# via tmux_set_opt from ORIG_*. Hook via the saved ORIG_HOOK verbatim
-	# (TRAP 2: preserve -b).
+	# --- STEP 4 (PRD §9 restore step 4): restore status / status-format /
+	#     key-table / renumber-windows / session-window-changed hook ---
+	# The matched teardown of ACTIVATE T3 (status grow) + T4.S1 (key-table switch)
+	# + T4.S2 (hook suppress) + the STEP-2 save. Goal: byte-identical to
+	# pre-activate (assertable by diffing show-options/show-hooks before vs after).
+	#
+	# status-format: TRAP 1 (system_context §4). Call the ALREADY-COMPLETE helper
+	#   in state.sh — it does `set-option -gu status-format` (clears EVERY index,
+	#   incl. the renderer line T3 installed, and tmux re-composes the [0,1,2]
+	#   defaults) then replays the saved user-set indices (>=3; EMPTY in this env).
+	#   NEVER replay captured default strings (fragile, fights tubular).
+	state_status_format_restore
+	# status: replay the RAW saved line-count value (e.g. "on"). NO case
+	#   normalization on restore (that was T3 grow-only, to dodge the $((on+1))
+	#   crash). -g required (T3's grow used -g; matched pair).
+	r_status="$(get_state "$ORIG_STATUS" "on")"
+	tmux set-option -g status "$r_status"
+	# key-table: CORRECTION (research FINDING 3) — MUST use -g. The no-g form does
+	#   NOT take effect on show-option -gv (verified; mirrors activate T4.S1
+	#   FINDING 3, which mandated -g on the switch). Default "root" (system_context §2).
+	r_kt="$(get_state "$ORIG_KEY_TABLE" "root")"
+	tmux set-option -g key-table "$r_kt"
+	# renumber-windows: round-trip the saved value (e.g. "on"). -g (matched pair).
+	r_renumber="$(get_state "$ORIG_RENUMBER" "on")"
+	tmux set-option -g renumber-windows "$r_renumber"
+	# session-window-changed hook: TRAP 2 (system_context §4) + the index-
+	#   preserving CORRECTION (research FINDING 5). GATED on the SAME option as
+	#   activate T4.S2's clear (mirror symmetry). Under the gate: replay every
+	#   saved `session-window-changed[N] <cmd>` line, preserving BOTH the index N
+	#   AND the command verbatim (incl. -b + absolute path). The index-less form
+	#   `set-hook -g session-window-changed "<cmd>"` ALWAYS writes [0] and would
+	#   CLOBBER multi-index hooks — use `session-window-changed[$hk_idx]`.
+	#   If nothing was saved (bare "session-window-changed" line), the loop skips
+	#   it -> no set-hook fires -> the hook stays cleared (== "leave unset").
+	if [ "$(opt_suppress_window_hook)" = "on" ]; then
+		r_hook="$(get_state "$ORIG_HOOK" "")"
+		while IFS= read -r hk_line; do
+			case "$hk_line" in
+				"session-window-changed"|"") continue ;;   # bare name / blank -> skip
+			esac
+			hk_idx="$(printf '%s\n' "$hk_line" | sed -n 's/^session-window-changed\[\([0-9]\+\)\].*/\1/p')"
+			hk_cmd="${hk_line#session-window-changed\[*\] }"
+			[ -z "$hk_idx" ] && continue
+			tmux set-hook -g "session-window-changed[$hk_idx]" "$hk_cmd" 2>/dev/null || true
+		done <<< "$r_hook"
+	fi
+	# When @livepicker-suppress-window-hook is "off": activate did NOT clear the
+	# hook, so the live hook is still the user's original -> restore does nothing
+	# here (the if skips). Symmetric with activate T4.S2.
 
 	# --- T4 (P1.M5.T4.S1): select-layout ORIG_LAYOUT + clear_all_state +
 	#     unbind-key -T livepicker (insert here) ---

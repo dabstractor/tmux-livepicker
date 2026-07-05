@@ -376,7 +376,7 @@
           "type": "Milestone",
           "id": "P1.M5",
           "title": "Restore orchestration (restore.sh)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Tear down the picker exactly, in the PRD §9 restore order: unlink the preview, select-window back to original, branch on keep vs cancel (cancel switches client back; keep does not), restore status/format/key-table/renumber/hook, restore the original window layout, and clear all @livepicker-* state. restore.sh keep is called by confirm; restore.sh cancel is called by cancel.",
           "tasks": [
             {
@@ -437,14 +437,14 @@
               "type": "Task",
               "id": "P1.M5.T3",
               "title": "Restore: status / key-table / renumber / hook",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Restore the global options and the suppressed hook to their exact pre-activation values.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T3.S1",
                   "title": "restore.sh: restore status, status-format (-gu trap), key-table, renumber, hook",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M5.T1.S1",
@@ -465,14 +465,14 @@
               "type": "Task",
               "id": "P1.M5.T4",
               "title": "Restore: layout restore + clear state + unbind table",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Re-apply the original window's pane layout exactly, clear every @livepicker-* option, and unbind the livepicker key table.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T4.S1",
                   "title": "restore.sh: select-layout ORIG_LAYOUT + clear_all_state + unbind livepicker",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M5.T3.S1",
