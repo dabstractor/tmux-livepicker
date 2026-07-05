@@ -155,21 +155,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Live preview subsystem (link-window, all panes)",
-          "status": "Planned",
+          "status": "Researching",
           "description": "The defining feature: preview.sh <session> links the candidate's active window into the current session and selects it so all panes render live below the status bar, without switching the client's session. Includes the self-session edge case and the capture-pane snapshot fallback. Standalone-testable against a multi-session, multi-pane socket.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "preview.sh — link-window live preview core",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Resolve the candidate session's active window id, unlink any previously linked preview, link-window -a into the current session, select-window to show all panes live, and record the linked id for the next navigation/exit.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "preview.sh: link/unlink/select with id tracking",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S1",
@@ -188,7 +188,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S2",
                   "title": "preview.sh: self-session edge case + capture-pane fallback + mode gate",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S1"
