@@ -47,13 +47,26 @@ source "$CURRENT_DIR/utils.sh"
 # shellcheck source=state.sh
 source "$CURRENT_DIR/state.sh"
 
-# S2 (P1.M3.T1.S2) REPLACES THIS STUB with the capture-pane snapshot fallback:
-#   tmux capture-pane -ep -t "=$1" ... written into the preview area; return 0.
-# S1's stub returns 1 so preview.sh exits non-zero on link failure (S1 contract
-# §4: "non-zero only if fallback also fails"; the caller — input-handler /
-# activate — decides). $1 = candidate session S (S2's capture target).
+# S2 (P1.M3.T1.S2) REPLACED THIS STUB with the capture-pane snapshot fallback:
+#   tmux capture-pane -ep -t "=$1:." captured to a local var (discarded —
+#   FINDING H: under run-shell bare escape sequences could corrupt the status
+#   area); returns capture's rc (0 = captured, non-zero = gone — S1 contract §4).
+# S1's stub returned 1 so preview.sh exited non-zero on link failure. $1 = S.
 preview_fallback() {
-	return 1
+	# capture-pane snapshot fallback (PRD §7 Fallbacks). Single-pane, NOT live.
+	# Invoked (a) when @livepicker-preview-mode == snapshot (always), and
+	# (b) when a live link-window fails (degraded but non-blocking path).
+	# Captures S's active pane with escapes to stdout. CRITICAL: the target is
+	# "=$1:." NOT "=$1" — the bare =$S form FAILS rc=1 "can't find pane" on
+	# 3.6b (= is a session-name matcher; capture-pane wants a pane target).
+	# Capture into a LOCAL var (not bare stdout): under run-shell, bare escape
+	# sequences could corrupt the status area. The captured text is intentionally
+	# discarded (FINDING H) — there is no separate buffer to render it into
+	# without a link (live mode's job); capturing just verifies reachability.
+	# Returns capture's rc: 0 = captured, non-zero = session/pane gone (§4).
+	local captured
+	# shellcheck disable=SC2034  # best-effort hint; text intentionally unused.
+	captured="$(tmux capture-pane -ep -t "=$1:." 2>/dev/null)" && return 0 || return 1
 }
 
 # argv[1] = candidate session name S.
@@ -67,12 +80,33 @@ preview_main() {
 	orig_window="$(get_state "$ORIG_WINDOW" "")"
 	linked_id="$(get_state "$STATE_LINKED_ID" "")"
 
-	# --- S2: insert the @livepicker-preview-mode gate here (live|snapshot|off) ---
+	# --- @livepicker-preview-mode gate (PRD §7 Fallbacks / §11; default live) ---
+	local mode
+	mode="$(opt_preview_mode)"   # live | snapshot | off
+	if [ "$mode" = "off" ]; then
+		# Show nothing. No link, no capture, no state change. (mode is constant
+		# for the picker lifetime, so no prior link exists to clean here.)
+		return 0
+	fi
+	if [ "$mode" = "snapshot" ]; then
+		# Snapshot: capture-pane of S's active pane; NEVER link. Self-session
+		# needs no special handling (capturing your own pane is harmless).
+		preview_fallback "$S"
+		return $?
+	fi
+	# mode == live (default): fall through to the link flow below.
 
 	# Self-session guard (PRD §7; FINDING 6). Do NOT link — would create an
-	# in-session duplicate; instead show the user their own session. Select the
-	# original window and return. (S1: do not unlink/clear LINKED_ID here.)
+	# in-session duplicate; instead show the user their own session. S2
+	# refinement (contract §3): first drop any prior preview linked into the
+	# driver (source keeps it — S1 FINDING 1; no -k, || true — S1 FINDING 2),
+	# clear LINKED_ID (tmux_unset_opt = -gu — FINDING E; matches state.sh
+	# teardown), THEN select the original window.
 	if [ -n "$current_session" ] && [ "$S" = "$current_session" ]; then
+		if [ -n "$linked_id" ]; then
+			tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
+			tmux_unset_opt "$STATE_LINKED_ID"
+		fi
 		[ -n "$orig_window" ] && tmux select-window -t "$orig_window" 2>/dev/null || true
 		return 0
 	fi
