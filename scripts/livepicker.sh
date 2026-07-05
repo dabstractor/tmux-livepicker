@@ -162,7 +162,77 @@ activate_main() {
 		5)        tmux set-option -g status 5   ;;   # 5-line cap; renderer overlays [lp_idx] (rare)
 		*)        tmux set-option -g status 2   ;;   # defensive default
 	esac
-	# --- T4 (P1.M4.T4.S1/S2): switch key-table + bind keys + suppress hook (insert here) ---
+	# --- T4 (P1.M4.T4.S1): build livepicker key table + switch key-table ---
+	# PRD §8 "Binding" + §6 step 4. While key-table==livepicker, tmux consults
+	# ONLY that table (system_context §3 INVARIANT B); unbound keys are DROPPED,
+	# never passed to root/prefix/pane. So the user's prefix/root bindings do NOT
+	# fire during the picker UNLESS explicitly copied in. This block, in this
+	# exact order:
+	#   (1) COPY the user's prefix + root bindings into livepicker (skipping the
+	#       repurposed next/prev keys), via `source-file` (NOT `tmux $line` —
+	#       word-split breaks on complex bindings like display-menu; research
+	#       FINDING 1). Skip removes the compound swap-window bindings so the
+	#       explicit nav binds below are authoritative (FINDING 4).
+	#   (2) BIND the explicit picker keys (typing/actions/nav) — these OVERRIDE
+	#       any copied same-key binding (e.g. Down/Up/Enter/a) because they run
+	#       LAST (FINDING 2 — copy-first/explicit-last is load-bearing). All
+	#       route through scripts/input-handler.sh (P1.M6; need not exist yet —
+	#       the binding only stores the command string; it is inert until a key
+	#       fires, which is after T5 sets mode-on).
+	#   (3) SWITCH key-table to livepicker (global, matching the -g save/restore
+	#       contract; the standalone `key-table` cmd is absent on 3.6b — FINDING 3).
+	# Discovery (PRD §8) is intentionally OMITTED: the defaults (C-M-Tab /
+	# C-M-BTab) already match this user's root-table window-nav keys
+	# (system_context §2), and discovery must not override explicit options.
+	local lp_key lp_keys lp_tf lp_c
+
+	# (1) COPY prefix + root -> livepicker via source-file (tmux's own parser
+	# re-binds each line; the sed rewrites ONLY the first `-T <table>` which is
+	# always the table spec). Skip next/prev keys (FINDING 4 skip pattern).
+	lp_key="$(opt_next_key)"
+	lp_keys="$(opt_prev_key)"
+	lp_tf="$(mktemp)"
+	{
+		tmux list-keys -T prefix 2>/dev/null | sed 's/-T prefix/-T livepicker/'
+		tmux list-keys -T root   2>/dev/null | sed 's/-T root/-T livepicker/'
+	} | grep -vE -- "-T livepicker[[:space:]]+(${lp_key}|${lp_keys})([[:space:]]|$)" > "$lp_tf"
+	tmux source-file "$lp_tf"
+	rm -f "$lp_tf"
+
+	# (2) BIND explicit picker keys (run AFTER the copy -> override any copied
+	# same-key binding). input-handler.sh path uses $CURRENT_DIR (the scripts/
+	# dir global; same idiom as T3's renderer install).
+	# typing: a-z A-Z 0-9 and - _ . / (PRD §8; FINDING 5 — `-` binds with no `--`).
+	for lp_c in {a..z} {A..Z} {0..9} - _ . /; do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh type $lp_c"
+	done
+	# backspace / confirm / cancel (space-list accessors -> word-split; SC2086).
+	# shellcheck disable=SC2086
+	for lp_c in $(opt_backspace_keys); do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh backspace"
+	done
+	# shellcheck disable=SC2086
+	for lp_c in $(opt_confirm_keys); do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh confirm"
+	done
+	# shellcheck disable=SC2086
+	for lp_c in $(opt_cancel_keys); do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh cancel"
+	done
+	# nav: next-key + nav-next-keys -> next-session; prev-key + nav-prev-keys -> prev-session.
+	# shellcheck disable=SC2086
+	for lp_c in $(opt_next_key) $(opt_nav_next_keys); do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh next-session"
+	done
+	# shellcheck disable=SC2086
+	for lp_c in $(opt_prev_key) $(opt_nav_prev_keys); do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh prev-session"
+	done
+
+	# (3) SWITCH the active key-table to livepicker (global; FINDING 3: -g is
+	# mandatory and the standalone `key-table` cmd does not exist on 3.6b).
+	tmux set-option -g key-table livepicker
+	# --- T4 (P1.M4.T4.S2): suppress session-window-changed hook (insert here) ---
 	# --- T5 (P1.M4.T5.S1): first preview + set @livepicker-mode on (insert here) ---
 	return 0
 }

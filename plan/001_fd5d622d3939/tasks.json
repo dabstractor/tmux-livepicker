@@ -297,14 +297,14 @@
               "type": "Task",
               "id": "P1.M4.T4",
               "title": "Activate: switch key-table + bind all keys + suppress hook",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Switch key-table to livepicker, bind typing/backspace/confirm/cancel/navigation keys (including the repurposed window-nav keys), copy the user's prefix and root bindings into the livepicker table, and suppress the session-window-changed hook for the picker duration.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T4.S1",
                   "title": "livepicker.sh: build livepicker key table (input + nav + copied bindings)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M4.T1.S1",
@@ -325,7 +325,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T4.S2",
                   "title": "livepicker.sh: suppress session-window-changed hook",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T1.S1",
