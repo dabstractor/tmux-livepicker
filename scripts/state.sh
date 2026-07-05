@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# scripts/state.sh — tmux-livepicker runtime state accessors + saved-state CONTRACT.
+#
+# Sourced library (NOT executed). Three responsibilities:
+#   1. set_state/get_state — thin accessors over the 6 @livepicker-* runtime keys.
+#   2. Named readonly constants for the saved-state CONTRACT (the integration seam
+#      P1.M4.T1.S1 activate writes and P1.M5.T3.S1 restore reads — PRD §9).
+#   3. The status-format -gu trap (state_status_format_save / _restore) +
+#      clear_all_state teardown.
+#
+# DEPENDS ON scripts/utils.sh: the caller MUST `source scripts/utils.sh` BEFORE this
+# file. We assume tmux_get_opt / tmux_set_opt / tmux_unset_opt are defined. We do NOT
+# source utils.sh ourselves (mirror the options/utils convention; no SCRIPT_DIR).
+#
+# CONTRACT CORRECTIONS encoded here (see research/state_module_findings.md):
+#   CORRECTION A — clear_all_state clears ONLY picker-internal keys (5 runtime +
+#     every @livepicker-orig-*). It MUST NOT unset PRD §11 config (@livepicker-fg,
+#     @livepicker-key, ...). The literal "grep '@livepicker-' and unset each" is a
+#     production bug (wipes user config mid-session). @livepicker-type is preserved
+#     (shared config+runtime mirror; the picker only reads it).
+#   CORRECTION D — the status-format "is this index user-set?" probe via tmux_is_set
+#     is USELESS (rc=0 for set/default/never-existed). The corrected mechanism:
+#     enumerate materialized indices from the bulk dump; tmux always materializes
+#     defaults [0,1,2]; indices >= 3 are user-set. Save stores only those; restore
+#     does the -gu reset (TRAP 1) then replays them.
+#
+# CONTRACT: sourcing this file has NO side effects (beyond defining readonly consts).
+# Coexists with options.sh (get_opt/opt_*) and utils.sh (tmux_*): disjoint namespacing.
+#
+# shellcheck disable=SC2034
+# SC2034 (file-wide): every STATE_* and ORIG_* constant is the saved-state CONTRACT —
+# an integration seam CONSUMED by external scripts (livepicker.sh activate P1.M4,
+# restore.sh P1.M5, input-handler.sh/preview.sh/renderer.sh P1.M2-M6) which source
+# this library and reference these names directly. They are intentionally unused
+# within this file; their stability across activate↔restore is the whole point.
+
+set -u   # NOT -e (show-option legitimately returns non-zero); NOT -o pipefail.
+
+# --- runtime state keys (picker-internal; cleared on exit by clear_all_state) ---
+readonly STATE_MODE="@livepicker-mode"
+readonly STATE_LIST="@livepicker-list"
+readonly STATE_FILTER="@livepicker-filter"
+readonly STATE_INDEX="@livepicker-index"
+readonly STATE_LINKED_ID="@livepicker-linked-id"
+readonly STATE_TYPE="@livepicker-type"   # session|window — ALIAS of PRD §11 config (read-only; NEVER cleared)
+
+# --- saved-state CONTRACT keys (PRD §9; written by activate, read by restore) ---
+readonly ORIG_SESSION="@livepicker-orig-session"
+readonly ORIG_WINDOW="@livepicker-orig-window"                         # window ID, NOT index
+readonly ORIG_LAYOUT="@livepicker-orig-layout"                         # window_layout string
+readonly ORIG_KEY_TABLE="@livepicker-orig-key-table"
+readonly ORIG_STATUS="@livepicker-orig-status"                         # status line-count value
+readonly ORIG_RENUMBER="@livepicker-orig-renumber-windows"
+readonly ORIG_HOOK="@livepicker-orig-session-window-changed"           # FULL show-hooks output (multi-line)
+readonly ORIG_STATUS_FORMAT_INDICES="@livepicker-orig-status-format-indices"
+readonly ORIG_STATUS_FORMAT_PREFIX="@livepicker-orig-status-format-"   # +N suffix (bracket-free)
+
+# keys clear_all_state unsets explicitly (STATE_TYPE deliberately absent: it is config)
+readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID"
+
+# $1: STATE_* key, $2: value. Writes a runtime @livepicker-* option (delegates to
+# utils tmux_set_opt). Caller passes a STATE_* constant, not a raw string.
+set_state() {
+	tmux_set_opt "$1" "$2"
+}
+
+# $1: STATE_* key, $2: optional default (returned when unset/empty). Reads a runtime
+# @livepicker-* option (delegates to utils tmux_get_opt). ${2:-} makes the default
+# OPTIONAL and safe under `set -u`.
+get_state() {
+	tmux_get_opt "$1" "${2:-}"
+}
+
+# SAVE the status-format array for later restore. Enumerates materialized indices
+# from `show-options -g status-format`; tmux always materializes the 3 built-in
+# defaults [0,1,2], so only indices >= 3 are treated as genuinely user-set (FINDING
+# D: the tmux_is_set exit-code probe is useless for status-format[n]). Stores the
+# user-set index list in ORIG_STATUS_FORMAT_INDICES and each value in a bracket-free
+# ORIG_STATUS_FORMAT_PREFIX+N key (brackets are rejected in @-names — utils FINDING 4).
+# LIMITATION: a genuine user override of [0,1,2] is NOT preserved (acceptable: the
+# target env has none — tubular unsets status-format — and the -gu restore is
+# provably correct when [0,1,2] are defaults).
+state_status_format_save() {
+	local bulk idx user_indices n val
+	bulk="$(tmux show-options -g status-format 2>/dev/null)"
+	user_indices=""
+	# heredoc (not a pipe) feeds $bulk to while-read so the loop runs in this shell
+	# (avoids a subshell scoping the user_indices accumulation under `set -u`).
+	while IFS= read -r line; do
+		idx="$(printf '%s\n' "$line" | sed -n 's/^status-format\[\([0-9]\+\)\].*/\1/p')"
+		[ -z "$idx" ] && continue
+		[ "$idx" -ge 3 ] || continue
+		user_indices="${user_indices}${user_indices:+ }$idx"
+	done <<EOF
+$bulk
+EOF
+	tmux_set_opt "$ORIG_STATUS_FORMAT_INDICES" "$user_indices"
+	# shellcheck disable=SC2086
+	# intentional word-split: $user_indices is the internal space-list of digit-only
+	# indices we just built; splitting is how we iterate each index in turn.
+	for n in $user_indices; do
+		val="$(tmux show-option -gqv "status-format[$n]" 2>/dev/null)"
+		tmux_set_opt "${ORIG_STATUS_FORMAT_PREFIX}${n}" "$val"
+	done
+}
+
+# RESTORE the status-format array (TRAP 1, system_context §4). Step 1: `set-option
+# -gu status-format` clears EVERY index and tmux re-composes the [0,1,2] defaults —
+# NEVER replay captured default strings (fragile, fights tubular). Step 2: replay
+# each genuinely-user-set index saved by state_status_format_save.
+state_status_format_restore() {
+	local indices n val
+	tmux_unset_opt status-format
+	indices="$(tmux_get_opt "$ORIG_STATUS_FORMAT_INDICES" "")"
+	# shellcheck disable=SC2086
+	# intentional word-split: $indices is the saved space-list of digit-only indices
+	# (empty when the user had no status-format overrides — the tubular common case).
+	for n in $indices; do
+		val="$(tmux_get_opt "${ORIG_STATUS_FORMAT_PREFIX}${n}" "")"
+		[ -n "$val" ] && tmux_set_opt "status-format[$n]" "$val"
+	done
+}
+
+# Tear down ALL picker-INTERNAL state. Unsets the 5 runtime keys + every
+# @livepicker-orig-* saved-state key. MUST NOT unset PRD §11 config (CORRECTION A):
+# `grep '@livepicker-'` broadly would wipe @livepicker-fg/#ffffff, @livepicker-key,
+# etc. We clear the runtime list explicitly and grep ONLY '@livepicker-orig-'.
+# @livepicker-type is preserved (shared config+runtime mirror; never written by us).
+# set-option -gu is safe on already-unset @-options (rc=0); `|| true` + 2>/dev/null
+# belt-and-braces. Key-table teardown (unbind-key -T livepicker) is restore.sh's
+# job (P1.M5.T4.S1) — clear_all_state clears OPTIONS only.
+clear_all_state() {
+	local k
+	# shellcheck disable=SC2086
+	# intentional word-split: $_STATE_RUNTIME_KEYS is the internal space-list of the
+	# 5 runtime @livepicker-* keys we deliberately enumerate and clear one-by-one.
+	for k in $_STATE_RUNTIME_KEYS; do
+		tmux set-option -gu "$k" 2>/dev/null || true
+	done
+	# heredoc (not `grep | while`) keeps the while-read in this shell so `k` scoping
+	# is correct; the grep output is captured at expansion time into the heredoc.
+	while IFS= read -r line; do
+		k="${line%% *}"
+		[ -n "$k" ] && tmux set-option -gu "$k" 2>/dev/null || true
+	done <<EOF
+$(tmux show-options -g 2>/dev/null | grep '@livepicker-orig-')
+EOF
+}
