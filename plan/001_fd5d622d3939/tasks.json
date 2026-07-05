@@ -210,7 +210,7 @@
           "type": "Milestone",
           "id": "P1.M4",
           "title": "Activate orchestration (livepicker.sh)",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Wire the subsystems on activation: double-activation guard, save original state per the state contract, build the session list, grow the status bar to two lines with the renderer on line 1, switch key-table to livepicker and bind all keys (typing/nav/confirm/cancel + copied prefix/root bindings), suppress the session-window-changed hook, run the first preview, and set mode on.",
           "tasks": [
             {
@@ -297,7 +297,7 @@
               "type": "Task",
               "id": "P1.M4.T4",
               "title": "Activate: switch key-table + bind all keys + suppress hook",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Switch key-table to livepicker, bind typing/backspace/confirm/cancel/navigation keys (including the repurposed window-nav keys), copy the user's prefix and root bindings into the livepicker table, and suppress the session-window-changed hook for the picker duration.",
               "subtasks": [
                 {
@@ -325,7 +325,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T4.S2",
                   "title": "livepicker.sh: suppress session-window-changed hook",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T1.S1",
@@ -346,14 +346,14 @@
               "type": "Task",
               "id": "P1.M4.T5",
               "title": "Activate: first preview + mode-on",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Run the initial preview of the current session (self-session path) and flip the mode guard on as the final activation step.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T5.S1",
                   "title": "livepicker.sh: first preview (self-session) + set mode on + refresh",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 0.5,
                   "dependencies": [
                     "P1.M4.T2.S1",

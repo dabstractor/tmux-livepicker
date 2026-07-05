@@ -232,7 +232,25 @@ activate_main() {
 	# (3) SWITCH the active key-table to livepicker (global; FINDING 3: -g is
 	# mandatory and the standalone `key-table` cmd does not exist on 3.6b).
 	tmux set-option -g key-table livepicker
-	# --- T4 (P1.M4.T4.S2): suppress session-window-changed hook (insert here) ---
+	# --- T4 (P1.M4.T4.S2): suppress session-window-changed hook ---
+	# PRD §7.11 "Side effects to suppress" + §16 "Hook suppression scope" +
+	# system_context §4 TRAP 2 / §7. select-window DURING preview fires
+	# session-window-changed, which runs the user's sync-window-focus.sh and
+	# would spam focus bytes into the linked preview window on every nav
+	# keystroke. When @livepicker-suppress-window-hook is "on" (PRD §11
+	# default), clear the LIVE global hook for the picker duration. The SAVED
+	# hook lives in @livepicker-orig-session-window-changed (captured verbatim
+	# by STEP 2 / T1, incl. the -b flag + absolute path) and is replayed
+	# EXACTLY by restore (P1.M5.T3.S1) — S2 does NOT touch that saved value.
+	# If the option is "off", leave the hook INTACT (preview nav runs
+	# sync-window-focus.sh — documented opt-in behavior). set-hook -gu clears
+	# EVERY index of the hook array (verified; system_context §7 recipe) and is
+	# a safe no-op on an already-cleared hook (rc=0). Uses the tmux_clear_hook
+	# helper from utils.sh (house style; raw `tmux set-hook -gu
+	# session-window-changed` is equivalent). NO -e (house style).
+	if [ "$(opt_suppress_window_hook)" = "on" ]; then
+		tmux_clear_hook session-window-changed
+	fi
 	# --- T5 (P1.M4.T5.S1): first preview + set @livepicker-mode on (insert here) ---
 	return 0
 }
