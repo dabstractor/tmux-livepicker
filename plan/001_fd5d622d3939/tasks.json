@@ -410,14 +410,14 @@
               "type": "Task",
               "id": "P1.M5.T2",
               "title": "Restore: keep vs cancel client branching",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Implement the single session-switch policy: cancel switches the client back to the original session (zero net navigation); keep does not switch (the confirm path already did the one switch-client).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T2.S1",
                   "title": "restore.sh: keep (no switch) / cancel (switch-client to ORIG_SESSION)",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M5.T1.S1"
@@ -437,14 +437,14 @@
               "type": "Task",
               "id": "P1.M5.T3",
               "title": "Restore: status / key-table / renumber / hook",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Restore the global options and the suppressed hook to their exact pre-activation values.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T3.S1",
                   "title": "restore.sh: restore status, status-format (-gu trap), key-table, renumber, hook",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M5.T1.S1",

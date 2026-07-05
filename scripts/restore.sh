@@ -54,7 +54,7 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session
+	local linked_id orig_window current_session orig_session mode
 
 	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
@@ -78,10 +78,27 @@ restore_main() {
 	orig_window="$(get_state "$ORIG_WINDOW" "")"
 	[ -n "$orig_window" ] && tmux select-window -t "$orig_window" 2>/dev/null || true
 
-	# --- T2 (P1.M5.T2.S1): keep/cancel client branch (insert here) ---
-	# PRD §9 restore step 3: if argv[1]=='cancel', switch-client -t "$ORIG_SESSION"
-	# (return to the original session); if 'keep', do NOT switch (stay on the
-	# chosen target). Reads "$1" and get_state "$ORIG_SESSION" "".
+	# --- STEP 3 (PRD §9 restore step 3): keep/cancel client branch ---
+	# cancel: switch the client back to the ORIGINAL session (exact-match `=`).
+	#   This is the ONLY switch-client in the cancel path. It DOES fire
+	#   client-session-changed (FINDING A), but the history engine dedups a
+	#   same-session event ([ "$to" = "$CURRENT" ] && return in do_hook) -> zero
+	#   net history entries. The client is back where it started.
+	# keep: do NOT switch. Confirm (P1.M6.T3.S1) already issued the ONE
+	#   switch-client to the chosen target; a second switch here would pollute
+	#   history. "keep -> 1" counts the confirm switch, not a restore switch.
+	#
+	# ${1:-} defaults the arg for `set -u` safety (input-handler always passes
+	# keep|cancel). ORIG_SESSION via get_state (client-independent; display-message
+	# is non-deterministic detached — FINDING E / T1.S1 FINDING 4). The `=` prefix
+	# is exact-match (PRD §13); `2>/dev/null || true` because the session may have
+	# vanished (FINDING C).
+	mode="${1:-}"
+	orig_session="$(get_state "$ORIG_SESSION" "")"
+	if [ "$mode" = "cancel" ] && [ -n "$orig_session" ]; then
+		tmux switch-client -t "=$orig_session" 2>/dev/null || true
+	fi
+	# keep: intentionally no else — doing nothing is the contract (FINDING D).
 
 	# --- T3 (P1.M5.T3.S1): restore status / status-format / key-table /
 	#     renumber-windows / session-window-changed hook (insert here) ---
