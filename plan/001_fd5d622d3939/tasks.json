@@ -118,21 +118,21 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Status-line picker renderer",
-          "status": "Researching",
+          "status": "Complete",
           "description": "The #() status command that draws the filtered session list with the highlighted selection, query, and count. Standalone-testable: set the @livepicker-* state options, invoke renderer.sh, assert the styled output.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "scripts/renderer.sh — filtered list + highlight + query + count",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Read @livepicker-list/filter/index/colors/show-count; filter case-insensitively by substring; highlight the item at the (filtered) index; emit a single tmux-format string suitable for status-format[0].",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "renderer.sh: filter, highlight, count, style emission",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1",
@@ -169,7 +169,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "preview.sh: link/unlink/select with id tracking",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S1",
