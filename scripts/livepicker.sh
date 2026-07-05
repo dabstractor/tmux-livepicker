@@ -251,7 +251,32 @@ activate_main() {
 	if [ "$(opt_suppress_window_hook)" = "on" ]; then
 		tmux_clear_hook session-window-changed
 	fi
-	# --- T5 (P1.M4.T5.S1): first preview + set @livepicker-mode on (insert here) ---
+	# --- T5 (P1.M4.T5.S1): first preview + set @livepicker-mode on + refresh ---
+	# PRD §6 Activation steps 6-7 + §10/§13. The FINAL activate step: show the
+	# first preview, arm the guard, force the renderer to draw. ORDER IS
+	# LOAD-BEARING (research FINDING 5): (1) preview; (2) mode-on LAST; (3)
+	# refresh. The first highlight is the current session (T2's initial index),
+	# so this is the SELF-SESSION path (PRD §7 / P1.M3.T1.S2): preview.sh reads
+	# current_session from @livepicker-orig-session, sees S == current_session,
+	# and select-window's ORIG_WINDOW WITHOUT linking (leaves @livepicker-linked-id
+	# empty). Read the session name from @livepicker-orig-session (saved by STEP 2;
+	# client-independent) — do NOT reuse T2's `current` (it is session:window_index
+	# in window mode). The `|| return 1` is REQUIRED: under house `set -u` (NO -e)
+	# a bare failing preview would fall through to mode-on, arming the guard on a
+	# broken picker (stuck). The guard makes "mode-on is LAST so a crash leaves
+	# mode off (re-activatable — PRD §16)" actually hold. (The self-session path
+	# always returns 0, so this guard is defensive — but it is the contract's
+	# stated safety property.) Then set @livepicker-mode on (arms the STEP-1
+	# double-activation guard). Then `tmux refresh-client -S` forces a status
+	# redraw that re-runs the #() renderer (PRD §10/§13; verified) so the picker
+	# list appears on line 1 NOW instead of waiting on status-interval. refresh
+	# targets the invoking client (the user pressed the key -> a client exists);
+	# its rc is non-fatal under no-set-e (best-effort draw — mode is already on).
+	local orig_session
+	orig_session="$(get_state "$ORIG_SESSION" "")"
+	"$CURRENT_DIR/preview.sh" "$orig_session" || return 1
+	set_state "$STATE_MODE" "on"
+	tmux refresh-client -S
 	return 0
 }
 

@@ -210,7 +210,7 @@
           "type": "Milestone",
           "id": "P1.M4",
           "title": "Activate orchestration (livepicker.sh)",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Wire the subsystems on activation: double-activation guard, save original state per the state contract, build the session list, grow the status bar to two lines with the renderer on line 1, switch key-table to livepicker and bind all keys (typing/nav/confirm/cancel + copied prefix/root bindings), suppress the session-window-changed hook, run the first preview, and set mode on.",
           "tasks": [
             {
@@ -346,14 +346,14 @@
               "type": "Task",
               "id": "P1.M4.T5",
               "title": "Activate: first preview + mode-on",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Run the initial preview of the current session (self-session path) and flip the mode guard on as the final activation step.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T5.S1",
                   "title": "livepicker.sh: first preview (self-session) + set mode on + refresh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 0.5,
                   "dependencies": [
                     "P1.M4.T2.S1",
@@ -383,14 +383,14 @@
               "type": "Task",
               "id": "P1.M5.T1",
               "title": "Restore: unlink preview + select original window",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Remove the linked preview window from the current session (source session keeps it) and re-select the original window.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M5.T1.S1",
                   "title": "restore.sh: unlink preview + select-window to ORIG_WINDOW",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1",
