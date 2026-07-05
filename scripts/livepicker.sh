@@ -113,7 +113,55 @@ activate_main() {
 	set_state "$STATE_LIST" "$list"
 	set_state "$STATE_FILTER" ""
 	set_state "$STATE_INDEX" "$idx"
-	# --- T3 (P1.M4.T3.S1): grow status bar + install renderer (insert here) ---
+	# --- T3 (P1.M4.T3.S1): grow status bar + install renderer ---
+	# PRD §10 steps 2-4, in order:
+	#   (a) SHIFT every genuinely-user-set status-format index up by one,
+	#       HIGHEST-FIRST (race-free — PRD §10 step 2 / tmux_primitives §3).
+	#       Source = ORIG_STATUS_FORMAT_INDICES (the >=3 space-list STEP 2 saved;
+	#       EMPTY in this env -> no-op). We read the LIVE value and copy to [n+1],
+	#       then unset [n] (single-index -gu kills ONLY [n] — research FINDING 2).
+	#       Restore (P1.M5.T3.S1) replays the saved values at the ORIGINAL [n]
+	#       after a -gu reset, so the user's overrides return to [n].
+	#   (b) INSTALL the picker renderer at IDX (=@livepicker-status-format-index,
+	#       default 0). DOUBLE quotes so $CURRENT_DIR expands to an ABSOLUTE path
+	#       at set-time; tmux #() then runs it on every redraw. Single quotes
+	#       would store a literal "$CURRENT_DIR" -> renderer never runs
+	#       (research FINDING 3).
+	#   (c) GROW the status line count by one (PRD §10 step 4). GOTCHA: tmux 3.6b
+	#       show-option -gv status returns on/off/2..5 — NOT 0/1; the literal
+	#       integer 1 is REJECTED ("unknown value: 1") and $((on+1)) CRASHES under
+	#       set -u ("unbound variable"). So normalize via case: on->2, off->on,
+	#       2..4->n+1, 5->5 (clamp). status-left/right/window-status-format are
+	#       LEFT UNTOUCHED (tubular owns them; Invariant C: line 2 composes from
+	#       them when status-format[1] is unset — research FINDING 5).
+	local sf_n sf_val sf_indices lp_idx orig_status
+	local -a sf_desc=()
+	# (a) shift genuinely-user-set indices HIGHEST-FIRST (no-op when the saved
+	# list is empty, as in this env). sf_indices is a digit-only space-list
+	# (state.sh contract); word-split is intentional and safe.
+	sf_indices="$(get_state "$ORIG_STATUS_FORMAT_INDICES" "")"
+	# Reverse the ascending saved list to DESCENDING (race-free for adjacent
+	# indices; ascending would overwrite the next index's original value).
+	# shellcheck disable=SC2086
+	for sf_n in $sf_indices; do sf_desc=("$sf_n" "${sf_desc[@]}"); done
+	for sf_n in "${sf_desc[@]}"; do
+		sf_val="$(tmux show-option -gqv "status-format[$sf_n]" 2>/dev/null)"
+		tmux set-option -g "status-format[$((sf_n + 1))]" "$sf_val"
+		tmux set-option -gu "status-format[$sf_n]"
+	done
+	# (b) install the picker renderer at the configured index (default 0).
+	lp_idx="$(opt_status_format_index)"
+	tmux set-option -g "status-format[$lp_idx]" "#($CURRENT_DIR/renderer.sh)"
+	# (c) grow the status line count by one — NORMALIZED for tmux's on/off/2..5
+	# (do NOT use $((orig_status + 1)): "on" crashes under set -u and 1 is rejected).
+	orig_status="$(get_state "$ORIG_STATUS" "on")"
+	case "$orig_status" in
+		off|0|"") tmux set-option -g status on  ;;   # was off -> 1 picker line
+		on)       tmux set-option -g status 2   ;;   # was 1 line -> 2 (typical)
+		2|3|4)    tmux set-option -g status "$((orig_status + 1))" ;;
+		5)        tmux set-option -g status 5   ;;   # 5-line cap; renderer overlays [lp_idx] (rare)
+		*)        tmux set-option -g status 2   ;;   # defensive default
+	esac
 	# --- T4 (P1.M4.T4.S1/S2): switch key-table + bind keys + suppress hook (insert here) ---
 	# --- T5 (P1.M4.T5.S1): first preview + set @livepicker-mode on (insert here) ---
 	return 0

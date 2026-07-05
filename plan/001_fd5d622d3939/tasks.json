@@ -270,14 +270,14 @@
               "type": "Task",
               "id": "P1.M4.T3",
               "title": "Activate: grow status bar + install renderer",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Shift existing status-format indices up by one (highest first), install the renderer on the configured index, and set the status line count to current+1.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T3.S1",
                   "title": "livepicker.sh: status grow (shift + install + set count)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T1.S1",
@@ -304,7 +304,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T4.S1",
                   "title": "livepicker.sh: build livepicker key table (input + nav + copied bindings)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M4.T1.S1",
