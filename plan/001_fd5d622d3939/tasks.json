@@ -501,14 +501,14 @@
               "type": "Task",
               "id": "P1.M6.T1",
               "title": "input-handler.sh: type action",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Append the typed character to the filter, recompute the filtered list, reset the index to the top match, and force a status redraw.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M6.T1.S1",
                   "title": "input-handler.sh type <char>",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1",
@@ -528,14 +528,14 @@
               "type": "Task",
               "id": "P1.M6.T2",
               "title": "input-handler.sh: backspace + next-session + prev-session",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Backspace shrinks the filter; next/prev move the index within the filtered list with wrapping and refresh the live preview.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M6.T2.S1",
                   "title": "input-handler.sh backspace / next-session / prev-session",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M6.T1.S1",
