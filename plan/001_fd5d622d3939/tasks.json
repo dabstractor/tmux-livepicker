@@ -694,14 +694,14 @@
               "type": "Task",
               "id": "P1.M7.T4",
               "title": "Live all-panes preview tests (PRD §15.19)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Verify the preview shows all panes of a candidate's active window live; that navigating away unlinks (candidate's window intact in its own session); and that the self-session highlight shows the user's own session without linking.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T4.S1",
                   "title": "tests/test_preview.sh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M7.T2.S1",
@@ -721,14 +721,14 @@
               "type": "Task",
               "id": "P1.M7.T5",
               "title": "Pollution tests — the core invariant (PRD §15.18)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Prove the central guarantee: browsing then cancel leaves @session-history-hist byte-identical; browsing then confirm adds EXACTLY one entry at the tip; the toggle returns to the pre-pick session after a confirm.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T5.S1",
                   "title": "tests/test_pollution.sh",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M7.T2.S1",
