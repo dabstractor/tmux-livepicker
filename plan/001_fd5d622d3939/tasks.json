@@ -644,14 +644,14 @@
               "type": "Task",
               "id": "P1.M7.T2",
               "title": "Test harness: helpers + runner",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Resurrect-style fail/teardown helpers and a runner that discovers and executes all test_* functions across test_*.sh files.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T2.S1",
                   "title": "tests/helpers.sh + tests/run.sh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M7.T1.S1"
@@ -667,14 +667,14 @@
               "type": "Task",
               "id": "P1.M7.T3",
               "title": "Functional validation tests (PRD §15.17)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Automate the functional checklist: activation grows status to two lines with the picker on line 1 and a live preview below; typing filters; C-M-Tab/C-M-BTab move the selection and the preview follows; Enter lands on the session; Escape returns to the original.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T3.S1",
                   "title": "tests/test_functional.sh",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M7.T2.S1",
