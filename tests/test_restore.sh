@@ -135,3 +135,49 @@ test_restore_preserves_custom_status_format_low_indices() {
 	assert_eq "$sf2_a" "$sf2_b" "status-format[2] (custom user override) preserved across restore"
 	assert_eq "$sf3_a" "$sf3_b" "status-format[3] (custom user override) preserved across restore"
 }
+
+# test_window_confirm_preserves_custom_status_format — Bugfix Issue 1: a window-mode
+# CONFIRM must leave status-format[0..3] byte-identical to pre-activation, exactly
+# like cancel/session-confirm. The window-mode confirm branch previously had a
+# DUPLICATE restore.sh keep-window call; its 2nd invocation ran with state already
+# cleared by the 1st -> state_status_format_restore replayed an EMPTY index list
+# after a `set-option -gu status-format`, wiping every custom override (and forcing
+# status/renumber-windows/key-table to defaults). Mirror the cancel-path test but
+# switch to @livepicker-type window and perform a CONFIRM.
+test_window_confirm_preserves_custom_status_format() {
+	attach_test_client
+	local sf0_b sf1_b sf2_b sf3_b sf0_a sf1_a sf2_a sf3_a
+
+	# Window mode (PRD §11 @livepicker-type). Must be set BEFORE activate.
+	tmux set-option -g @livepicker-type window
+
+	# Genuine user overrides at indices 0..3 (same values as the cancel-path test).
+	tmux set-option -g 'status-format[0]' '#[fg=red]custom-zero'
+	tmux set-option -g 'status-format[1]' '#[fg=green]custom-one'
+	tmux set-option -g 'status-format[2]' '#[fg=yellow]custom-two'
+	tmux set-option -g 'status-format[3]' '#[fg=blue]custom-three'
+
+	sf0_b="$(tmux show-option -gqv 'status-format[0]' 2>/dev/null)"
+	sf1_b="$(tmux show-option -gqv 'status-format[1]' 2>/dev/null)"
+	sf2_b="$(tmux show-option -gqv 'status-format[2]' 2>/dev/null)"
+	sf3_b="$(tmux show-option -gqv 'status-format[3]' 2>/dev/null)"
+
+	# Give alpha a 2nd window so window mode has a robust confirmable target.
+	tmux new-window -t alpha -n chosenwin
+
+	"$LIVEPICKER_SCRIPTS/livepicker.sh" >/dev/null
+	# Type "alpha" -> filtered list = alpha's windows (tokens "alpha:0"/"alpha:1").
+	for c in a l p h a; do "$LIVEPICKER_SCRIPTS/input-handler.sh" type "$c" >/dev/null; done
+	# Window-mode CONFIRM (the path that regressed). Lands on alpha; restores once.
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" confirm >/dev/null
+
+	sf0_a="$(tmux show-option -gqv 'status-format[0]' 2>/dev/null)"
+	sf1_a="$(tmux show-option -gqv 'status-format[1]' 2>/dev/null)"
+	sf2_a="$(tmux show-option -gqv 'status-format[2]' 2>/dev/null)"
+	sf3_a="$(tmux show-option -gqv 'status-format[3]' 2>/dev/null)"
+
+	assert_eq "$sf0_a" "$sf0_b" "status-format[0] preserved across window-mode confirm"
+	assert_eq "$sf1_a" "$sf1_b" "status-format[1] preserved across window-mode confirm"
+	assert_eq "$sf2_a" "$sf2_b" "status-format[2] preserved across window-mode confirm"
+	assert_eq "$sf3_a" "$sf3_b" "status-format[3] preserved across window-mode confirm"
+}

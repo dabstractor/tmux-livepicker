@@ -298,7 +298,6 @@ input_main() {
 				# Tear down picker state but PRESERVE the chosen window selection
 				# (keep-window skips restore STEP-2's ORIG_WINDOW re-select).
 				"$CURRENT_DIR/restore.sh" keep-window
-					"$CURRENT_DIR/restore.sh" keep-window
 				else
 					# Session mode: the helper unlinks the driver preview BEFORE
 					# switch-client (FINDING 1/2 — load-bearing), switches once,
