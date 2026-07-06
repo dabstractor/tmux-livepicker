@@ -365,26 +365,26 @@ picker updates immediately rather than waiting on `status-interval`.
 
 All options use the `@livepicker-` prefix.
 
-| Option | Default | Purpose |
-|---|---|---|
-| `@livepicker-key` | (required) | Prefix key that activates the picker. If unset, the plugin prints a `display-message` and does not bind. |
-| `@livepicker-type` | `session` | `session` or `window`. What the picker lists. |
-| `@livepicker-create` | `on` | In session mode, create a new session from the query on Enter when nothing matches. |
-| `@livepicker-next-key` | `C-M-Tab` | Key that moves to the next session. Defaults to this user's next-window key. |
-| `@livepicker-prev-key` | `C-M-BTab` | Key that moves to the previous session. Defaults to this user's prev-window key. |
-| `@livepicker-nav-next-keys` | `Down j` | Extra next-session keys. |
-| `@livepicker-nav-prev-keys` | `Up k` | Extra previous-session keys. |
-| `@livepicker-confirm-keys` | `Enter` | Confirm and land on the selection. |
-| `@livepicker-cancel-keys` | `Escape` | Clear the query, or cancel if the query is empty. |
-| `@livepicker-backspace-keys` | `BSpace` | Remove the last filter character. |
-| `@livepicker-preview-mode` | `live` | `live` (link-window, all panes), `snapshot` (capture-pane, active pane), or `off`. |
-| `@livepicker-suppress-window-hook` | `on` | Clear `session-window-changed` during the picker to avoid focus-resync side effects. |
-| `@livepicker-fg` | `default` | Picker text color. |
-| `@livepicker-bg` | `default` | Picker background. |
-| `@livepicker-highlight-fg` | `black` | Highlighted (current) item text. |
-| `@livepicker-highlight-bg` | `yellow` | Highlighted item background. |
-| `@livepicker-show-count` | `on` | Show `index/total` in the picker. |
-| `@livepicker-status-format-index` | `0` | Which status line the picker takes. |
+| Option                             | Default    | Purpose                                                                                                  |
+| ---------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------- |
+| `@livepicker-key`                  | (required) | Prefix key that activates the picker. If unset, the plugin prints a `display-message` and does not bind. |
+| `@livepicker-type`                 | `session`  | `session` or `window`. What the picker lists.                                                            |
+| `@livepicker-create`               | `on`       | In session mode, create a new session from the query on Enter when nothing matches.                      |
+| `@livepicker-next-key`             | `C-M-Tab`  | Key that moves to the next session. Defaults to this user's next-window key.                             |
+| `@livepicker-prev-key`             | `C-M-BTab` | Key that moves to the previous session. Defaults to this user's prev-window key.                         |
+| `@livepicker-nav-next-keys`        | `Down j`   | Extra next-session keys.                                                                                 |
+| `@livepicker-nav-prev-keys`        | `Up k`     | Extra previous-session keys.                                                                             |
+| `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                       |
+| `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                        |
+| `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                        |
+| `@livepicker-preview-mode`         | `live`     | `live` (link-window, all panes), `snapshot` (capture-pane, active pane), or `off`.                       |
+| `@livepicker-suppress-window-hook` | `on`       | Clear `session-window-changed` during the picker to avoid focus-resync side effects.                     |
+| `@livepicker-fg`                   | `default`  | Picker text color.                                                                                       |
+| `@livepicker-bg`                   | `default`  | Picker background.                                                                                       |
+| `@livepicker-highlight-fg`         | `black`    | Highlighted (current) item text.                                                                         |
+| `@livepicker-highlight-bg`         | `yellow`   | Highlighted item background.                                                                             |
+| `@livepicker-show-count`           | `on`       | Show `index/total` in the picker.                                                                        |
+| `@livepicker-status-format-index`  | `0`        | Which status line the picker takes.                                                                      |
 
 ## 12. File layout
 
@@ -514,3 +514,7 @@ With `tmux-session-history` installed:
 - **tmux floor.** `link-window`, multi-line `status`, and `set-hook` require
   tmux 3.0 or newer. `-f '#{window_active}'` filtering on `list-windows` is
   available on 3.0+. Target 3.0 as the floor; test on the installed 3.6b.
+- **Live Testing** Testing must _always_ be performed in an isolated tmux session
+  to avoid conflicting with the user's live, running instance. When a final real
+  -world test must be performed, it is critical to ensure that the user's
+  initial state be returned upon completion.
