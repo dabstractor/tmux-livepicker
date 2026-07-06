@@ -615,7 +615,7 @@
           "type": "Milestone",
           "id": "P1.M7",
           "title": "Validation — socket-isolated test harness + PRD §15 checks",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Build the PATH-wrapper socket-isolation test harness (which no sibling plugin provides — must be invented), the resurrect-style test helpers/runner, and the full PRD §15 validation suite: functional, pollution (the core invariant), live all-panes preview, key repurpose, restore, and create-on-enter. All tests run against an isolated tmux -L socket so the user's real server is never touched.",
           "tasks": [
             {
@@ -750,14 +750,14 @@
               "type": "Task",
               "id": "P1.M7.T6",
               "title": "Restore + key-repurpose + create-on-enter tests (PRD §15.20–22)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Verify exact restoration of status/format/key-table/renumber/hook and pane layout, no leftover @livepicker-* options; that window-nav keys move sessions during the picker and windows after; and create-on-enter behavior across modes.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T6.S1",
                   "title": "tests/test_restore.sh + test_keyrepurpose.sh + test_create.sh",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M7.T2.S1",
@@ -797,7 +797,7 @@
                   "type": "Subtask",
                   "id": "P1.M8.T1.S1",
                   "title": "README.md — overview, install, config table, usage, compatibility",
-                  "status": "Researching",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
