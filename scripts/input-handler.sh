@@ -294,10 +294,50 @@ input_main() {
 			"$CURRENT_DIR/restore.sh" cancel
 			return 0
 			;;
-		# --- P1.M6.T4.S1 seam: cancel ---
-		# restore.sh cancel (unlink preview, restore status/key-table/layout/hook,
-		# switch-client back to ORIG_SESSION, clear @livepicker-* state).
+		# --- P1.M6.T4.S1: two-step cancel (PRD §6 Cancel + §11 + work-item §1).
+		#     "clears the query, or cancels if the query is empty."
+		# Research FINDING 5: cancel takes argv[1] ONLY — it MUST NOT reference $2
+		# (the cancel binding passes no char; mirror confirm/nav/backspace).
 		cancel)
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			if [ -n "$cur_filter" ]; then
+				# First press with a NON-empty filter: CLEAR the query (like
+				# backspace-to-empty) and KEEP THE PICKER OPEN. This is the
+				# load-bearing UX detail (work-item §1). Mirror backspace (T2.S1)
+				# exactly: set filter, set index=0, refresh — but write "" (the
+				# WHOLE query) instead of ${cur_filter%?} (one char).
+				# FINDING 1: set_state "" is a SET-EMPTY (tmux set-option -g @x ""),
+				# NOT an unset; get_state reads it back as "" (the default). Do NOT
+				# use tmux_unset_opt / -gu (that is restore's teardown concern).
+				set_state "$STATE_FILTER" ""
+				# Reset the highlight to the top filtered match (PRD §6). Always
+				# safe — the renderer clamps + handles FLEN=0 (empty filter matches
+				# ALL names; renderer FINDING 4 / filter.sh).
+				set_state "$STATE_INDEX" "0"
+				# Force the #() renderer to re-run so the picker redraws with the
+				# empty query + the full list (PRD §10/§16). Guard the detached edge
+				# (mirror backspace / type / restore.sh STEP 6c).
+				tmux refresh-client -S 2>/dev/null || true
+				# LOAD-BEARING return: this is what keeps the picker OPEN. Omitting
+				# it would fall through to restore.sh cancel (the picker would tear
+				# down on the FIRST press — the exact bug the two-step semantics
+				# prevents). The clear path writes ONLY @livepicker-filter +
+				# @livepicker-index (picker-internal); mode/list/key-table/status
+				# are untouched (FINDING 2). No switch-client -> 0 history.
+				return 0
+			fi
+			# Filter ALREADY empty: full cancel (PRD §6 Cancel + §9). Delegate ALL
+			# teardown to restore.sh cancel (P1.M5, IMMUTABLE): it unlinks the
+			# preview (STEP-1, on current_session==driver — correct: cancel never
+			# switched, confirm FINDING 3's "no-switch -> leave cleanup to restore"),
+			# selects ORIG_WINDOW (STEP-2), switch-client -t "=$ORIG_SESSION"
+			# (STEP-3 — a SAME-SESSION switch the engine dedups -> 0 net history,
+			# FINDING 4 / restore_findings A), restores status/key-table/renumber/
+			# hook (STEP-4) + layout (STEP-5), clear_all_state + unbind-key -a -T
+			# livepicker + refresh-client -S (STEP-6).
+			# FINDING 6: use $CURRENT_DIR (the house variable; == scripts/). Do NOT
+			# use $SCRIPT_DIR (undefined here -> set -u crash).
+			"$CURRENT_DIR/restore.sh" cancel
 			return 0
 			;;
 		*)

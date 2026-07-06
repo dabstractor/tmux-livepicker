@@ -494,7 +494,7 @@
           "type": "Milestone",
           "id": "P1.M6",
           "title": "Input handler (type / backspace / nav / confirm / cancel)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "scripts/input-handler.sh <action> [arg] dispatches every bound key: type appends to the filter and resets to the top match; backspace removes a char; next/prev move the index within the filtered list (wrapping) and refresh the preview; confirm resolves the target, creates a session if needed, issues the single switch-client, and calls restore keep; cancel calls restore cancel. Every action ends with refresh-client -S.",
           "tasks": [
             {
@@ -588,14 +588,14 @@
               "type": "Task",
               "id": "P1.M6.T4",
               "title": "input-handler.sh: cancel",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Delegate to restore.sh cancel, which unlinks, switches the client back to the original session, restores all state, and clears @livepicker-*.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M6.T4.S1",
                   "title": "input-handler.sh cancel",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 0.5,
                   "dependencies": [
                     "P1.M5.T4.S1"
