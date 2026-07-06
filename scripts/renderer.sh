@@ -49,7 +49,7 @@ render() {
 	local LIST FILTER IDX
 	local -a all=() filtered=()
 	local TOTAL FLEN
-	local out seg i cidx first
+	local out seg i cidx first esc_filter esc_name
 
 	TYPE="$(opt_type)"
 	FG="$(opt_fg)"
@@ -64,6 +64,7 @@ render() {
 
 	LIST="$(get_state "$STATE_LIST" "")"
 	FILTER="$(get_state "$STATE_FILTER" "")"
+	esc_filter="${FILTER//\#/##}"   # display escape: every # -> ## (tmux literal-#; Issue 3)
 	IDX="$(get_state "$STATE_INDEX" "0")"
 
 	mapfile -t all < <(printf '%s' "$LIST")
@@ -75,9 +76,9 @@ render() {
 	out=""
 	if [ "$FLEN" -eq 0 ]; then
 		if [ "$SHOW_COUNT" -eq 1 ]; then
-			out="#[fg=$FG,bg=$BG]query> $FILTER (no match) 0/$TOTAL#[default]"
+			out="#[fg=$FG,bg=$BG]query> $esc_filter (no match) 0/$TOTAL#[default]"
 		else
-			out="#[fg=$FG,bg=$BG]query> $FILTER (no match)#[default]"
+			out="#[fg=$FG,bg=$BG]query> $esc_filter (no match)#[default]"
 		fi
 		printf '%s' "$out"
 		return 0
@@ -90,10 +91,11 @@ render() {
 
 	first=1
 	for i in "${!filtered[@]}"; do
+		esc_name="${filtered[$i]//\#/##}"   # display escape: every # -> ## (tmux literal-#; Issue 3)
 		if [ "$i" -eq "$cidx" ]; then
-			seg="#[fg=$HFG,bg=$HBG]${filtered[$i]}#[default]"
+			seg="#[fg=$HFG,bg=$HBG]${esc_name}#[default]"
 		else
-			seg="#[fg=$FG,bg=$BG]${filtered[$i]}#[default]"
+			seg="#[fg=$FG,bg=$BG]${esc_name}#[default]"
 		fi
 		if [ "$first" -eq 1 ]; then
 			out="$seg"
@@ -104,7 +106,7 @@ render() {
 	done
 
 	if [ "$SHOW_COUNT" -eq 1 ]; then
-		out="$out #[fg=$FG,bg=$BG]query> $FILTER [$((cidx + 1))/$FLEN]#[default]"
+		out="$out #[fg=$FG,bg=$BG]query> $esc_filter [$((cidx + 1))/$FLEN]#[default]"
 	fi
 
 	printf '%s' "$out"

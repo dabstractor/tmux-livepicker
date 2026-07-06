@@ -278,3 +278,58 @@ test_preview_follows_backspace() {
 	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "$expected" \
 		"backspace-to-clear re-synced the preview to the top of the full list"
 }
+
+# test_renderer_escapes_hash_in_names — Bugfix Issue 3: a candidate name containing
+# `#` must be emitted DOUBLED (`##`) so tmux renders it literally instead of
+# interpreting it as a format specifier (#d=day, #[...]=style, ##=literal #). The
+# renderer reads @livepicker-list/filter/index directly (client-independent: NO
+# attach_test_client). Seeds the 3 options, runs renderer.sh, asserts the stdout
+# contains the escaped `##dev` form (NOT the raw `#dev`). Before the fix this
+# asserted substring is absent (test FAILS). NOTE: assert the POSITIVE `##dev`,
+# not a negative `#dev` — `##dev` CONTAINS the substring `#dev`, so a negative
+# check would FALSE-FAIL after the fix (research FINDING 6).
+test_renderer_escapes_hash_in_names() {
+	setup_test "lp-bug3-names"
+	# `#` is a legal session name char (research FINDING 1) — create it to mirror
+	# how activate's list-sessions would capture it.
+	tmux new-session -d -s "#dev" -x 120 -y 40
+	# Seed the minimal state the renderer reads (mirror lp_preview_seed_state,
+	# inline). @livepicker-list holds the raw name (escaping is display-only).
+	tmux set-option -g "@livepicker-list" "#dev"
+	tmux set-option -g "@livepicker-filter" ""
+	tmux set-option -g "@livepicker-index" "0"
+	local out
+	out="$("$LIVEPICKER_SCRIPTS/renderer.sh")"
+	# POSITIVE assertion: the escaped form is present. (Highlighted item segment.)
+	assert_contains "$out" "##dev" "renderer escaped # -> ## in the candidate name"
+	# Sanity: stored state is UNCHANGED (escaping is display-only — confirm/nav
+	# still resolve the real name). @livepicker-list must still be the raw #dev.
+	assert_eq "$(tmux show-option -gqv @livepicker-list)" "#dev" \
+		"renderer did NOT mutate stored @livepicker-list (escape is display-only)"
+}
+
+# test_renderer_escapes_hash_in_filter — Bugfix Issue 3 (filter half): the live
+# query `$FILTER` is also emitted into the `query> …` display at 3 sites (empty-
+# list no-match branch ×2, count-suffix match branch). A filter containing `#`
+# must be escaped to `##` in BOTH branches. Exercises the match branch (filter
+# `#dev`, list `#dev` -> query> ##dev [1/1]) and the no-match branch (filter
+# `#zz`, list `#dev` -> query> ##zz (no match)). Asserts the POSITIVE escaped
+# form `query> ##...` (research FINDING 6).
+test_renderer_escapes_hash_in_filter() {
+	setup_test "lp-bug3-filter"
+	tmux new-session -d -s "#dev" -x 120 -y 40
+	# --- match branch: filter `#dev` matches the `#dev` name ---
+	tmux set-option -g "@livepicker-list" "#dev"
+	tmux set-option -g "@livepicker-filter" "#dev"
+	tmux set-option -g "@livepicker-index" "0"
+	local out
+	out="$("$LIVEPICKER_SCRIPTS/renderer.sh")"
+	assert_contains "$out" "query> ##dev" \
+		"renderer escaped # -> ## in the query (match branch, count suffix)"
+	# --- no-match branch: filter `#zz` matches nothing ---
+	tmux set-option -g "@livepicker-filter" "#zz"
+	out="$("$LIVEPICKER_SCRIPTS/renderer.sh")"
+	assert_contains "$out" "query> ##zz" \
+		"renderer escaped # -> ## in the query (no-match branch)"
+	assert_contains "$out" "(no match)" "no-match branch rendered the (no match) line"
+}
