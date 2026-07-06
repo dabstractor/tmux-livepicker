@@ -667,14 +667,14 @@
               "type": "Task",
               "id": "P1.M7.T3",
               "title": "Functional validation tests (PRD §15.17)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Automate the functional checklist: activation grows status to two lines with the picker on line 1 and a live preview below; typing filters; C-M-Tab/C-M-BTab move the selection and the preview follows; Enter lands on the session; Escape returns to the original.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T3.S1",
                   "title": "tests/test_functional.sh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M7.T2.S1",
@@ -694,14 +694,14 @@
               "type": "Task",
               "id": "P1.M7.T4",
               "title": "Live all-panes preview tests (PRD §15.19)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Verify the preview shows all panes of a candidate's active window live; that navigating away unlinks (candidate's window intact in its own session); and that the self-session highlight shows the user's own session without linking.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T4.S1",
                   "title": "tests/test_preview.sh",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M7.T2.S1",
