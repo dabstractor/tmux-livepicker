@@ -85,8 +85,26 @@ _confirm_land_on_session() {
 	# WITHOUT -k removes ONE link; the source session KEEPS its window (preview.sh
 	# FINDING 1). Singly-linked edge rc=1 is swallowed (preview.sh FINDING 2). Empty
 	# linked_id (self-session was last previewed, or preview never ran) -> skip.
-	if [ -n "$linked_id" ]; then
-		tmux unlink-window -t "$orig_session:$linked_id" 2>/dev/null || true
+	# H2 HARDEN: unlink-window WITHOUT -k removes ONE link, but if the named
+	# session's ONLY window is linked_id, tmux KILLS that session (rc=0). The
+	# driver (ORIG_SESSION) normally retains ORIG_WINDOW, so this is defensive —
+	# but verify the driver has another window before unlinking; if not, leave the
+	# link (the switch + restore keep will handle it, and killing the driver would
+	# strand the client). Count windows in orig_session EXCLUDING nothing — if
+	# count > 1 OR the linked window is not the active one, unlink is safe.
+	if [ -n "$linked_id" ] && [ -n "$orig_session" ]; then
+		local drv_wins drv_active
+		drv_wins="$(tmux list-windows -t "=$orig_session" 2>/dev/null | wc -l)"
+		drv_active="$(tmux list-windows -t "=$orig_session" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
+		# Safe to unlink when the driver has >1 window, OR the active window is a
+		# different one (so unlinking linked_id won't empty the session). When the
+		# driver has exactly one window AND it is linked_id, skip the unlink to
+		# avoid killing the driver (the switch-client below moves the client off
+		# it anyway; the orphaned link is benign — it unlinks with the source on
+		# restore if still present).
+		if [ "$drv_wins" -gt 1 ] || [ "$drv_active" != "$linked_id" ]; then
+			tmux unlink-window -t "$orig_session:$linked_id" 2>/dev/null || true
+		fi
 	fi
 	# The ONE session switch (PRD §4/§6/§14). exact-match = (FINDING 8); guard a
 	# vanished session. Fires client-session-changed ONCE — the engine dedups a
@@ -101,7 +119,7 @@ _confirm_land_on_session() {
 
 # argv[1] = action; argv[2] = the typed char (for `type`). Dispatch + act.
 input_main() {
-	local action char new_filter cur_filter cur_list cur_index L new_idx target pick_type query
+	local action char new_filter cur_filter cur_list cur_index L new_idx target pick_type query orig_session linked_id
 	local -a filtered=()
 	action="${1:-}"
 
@@ -248,19 +266,39 @@ input_main() {
 			fi
 			if [ -n "$target" ]; then
 				if [ "$pick_type" = "window" ]; then
-					# Window mode (PRD §6/§15.22; FINDING 6/8). target is ALREADY a
-					# full "session:window_index" token (livepicker.sh builds the
-					# list that way) -> pass it straight to select-window. NO
-					# switch-client, NO creation, NO driver-preview unlink (FINDING
-					# 3: no switch => current_session stays == driver => restore
-					# STEP-1 cleans the link correctly). CAVEAT (FINDING 8, known
-					# MVP limitation): restore keep's STEP-2 re-selects ORIG_WINDOW
-					# in the driver, so a window confirm tears down to ORIG_WINDOW.
-					# restore.sh is immutable (P1.M5 COMPLETE); this implements the
-					# literal contract. The work-item MOCKING asserts only "no
-					# creation".
-					tmux select-window -t "$target" 2>/dev/null || true
-					"$CURRENT_DIR/restore.sh" keep
+				# Window mode (PRD §3/§6; M1 FIX). target is a full
+				# "session:window_index" token. To LAND on the chosen window the client
+				# must (a) drop the driver's preview window FIRST (the linked window is
+				# a shared object; leaving the driver link would be stale), (b) switch
+				# to the TARGET's session, (c) select the chosen window there. Then
+				# restore with `keep-window` so STEP-2 does NOT re-select ORIG_WINDOW
+				# (which would undo the selection and strand the client on the original
+				# window). Split target on the FIRST ':' only (session names cannot
+				# contain ':'; window names may in pathological cases).
+				local w_sess
+				w_sess="${target%%:*}"
+				orig_session="$(get_state "$ORIG_SESSION" "")"
+				linked_id="$(get_state "$STATE_LINKED_ID" "")"
+				# Drop the driver's preview window BEFORE the switch (mirror
+				# _confirm_land_on_session's H2-hardened unlink). linked_id may be
+				# empty (self-session / no preview ran) -> skip.
+				if [ -n "$linked_id" ] && [ -n "$orig_session" ]; then
+					local drv_wins drv_active
+					drv_wins="$(tmux list-windows -t "=$orig_session" 2>/dev/null | wc -l)"
+					drv_active="$(tmux list-windows -t "=$orig_session" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
+					if [ "$drv_wins" -gt 1 ] || [ "$drv_active" != "$linked_id" ]; then
+						tmux unlink-window -t "$orig_session:$linked_id" 2>/dev/null || true
+					fi
+				fi
+				# Switch the client to the target's session (the ONE session switch;
+				# exact-match). Fires client-session-changed once (expected at confirm).
+				tmux switch-client -t "=$w_sess" 2>/dev/null || true
+				# Select the chosen window in the target session (target = session:index).
+				tmux select-window -t "$target" 2>/dev/null || true
+				# Tear down picker state but PRESERVE the chosen window selection
+				# (keep-window skips restore STEP-2's ORIG_WINDOW re-select).
+				"$CURRENT_DIR/restore.sh" keep-window
+					"$CURRENT_DIR/restore.sh" keep-window
 				else
 					# Session mode: the helper unlinks the driver preview BEFORE
 					# switch-client (FINDING 1/2 — load-bearing), switches once,

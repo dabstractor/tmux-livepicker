@@ -72,14 +72,19 @@ get_state() {
 }
 
 # SAVE the status-format array for later restore. Enumerates materialized indices
-# from `show-options -g status-format`; tmux always materializes the 3 built-in
-# defaults [0,1,2], so only indices >= 3 are treated as genuinely user-set (FINDING
-# D: the tmux_is_set exit-code probe is useless for status-format[n]). Stores the
-# user-set index list in ORIG_STATUS_FORMAT_INDICES and each value in a bracket-free
-# ORIG_STATUS_FORMAT_PREFIX+N key (brackets are rejected in @-names — utils FINDING 4).
-# LIMITATION: a genuine user override of [0,1,2] is NOT preserved (acceptable: the
-# target env has none — tubular unsets status-format — and the -gu restore is
-# provably correct when [0,1,2] are defaults).
+# from `show-options -g status-format` and saves EVERY one (indices 0-9, per PRD
+# §10 "save every set status-format[n] (indices 0 through 9)"). tmux materializes
+# the 3 built-in defaults [0,1,2] even when unset, so the exit-code probe cannot
+# distinguish user-set from default (FINDING D). Instead we capture the live value
+# of every materialized index; restore replays them after the -gu reset. This is
+# correct in both cases:
+#   - default [0,1,2]: the captured string IS the tmux default; replaying it after
+#     -gu (which re-composes the same default) is a no-op-equivalent -> safe.
+#   - user-overridden [0,1,2]: the captured string is the user override; it is
+#     faithfully replayed -> preserved (M2 fix; the old >=3-only shortcut dropped
+#     genuine user overrides of [0,1,2]).
+# Stores the index list in ORIG_STATUS_FORMAT_INDICES and each value in a
+# bracket-free ORIG_STATUS_FORMAT_PREFIX+N key (brackets rejected in @-names).
 state_status_format_save() {
 	local bulk idx user_indices n val
 	bulk="$(tmux show-options -g status-format 2>/dev/null)"
@@ -89,7 +94,7 @@ state_status_format_save() {
 	while IFS= read -r line; do
 		idx="$(printf '%s\n' "$line" | sed -n 's/^status-format\[\([0-9]\+\)\].*/\1/p')"
 		[ -z "$idx" ] && continue
-		[ "$idx" -ge 3 ] || continue
+		[ "$idx" -ge 0 ] && [ "$idx" -le 9 ] || continue
 		user_indices="${user_indices}${user_indices:+ }$idx"
 	done <<EOF
 $bulk
@@ -104,10 +109,12 @@ EOF
 	done
 }
 
-# RESTORE the status-format array (TRAP 1, system_context §4). Step 1: `set-option
-# -gu status-format` clears EVERY index and tmux re-composes the [0,1,2] defaults —
-# NEVER replay captured default strings (fragile, fights tubular). Step 2: replay
-# each genuinely-user-set index saved by state_status_format_save.
+# RESTORE the status-format array (TRAP 1, system_context §4). Step 1:
+# `set-option -gu status-format` clears EVERY index and tmux re-composes the
+# [0,1,2] defaults. Step 2: replay EVERY index saved by state_status_format_save
+# (now 0-9, per the M2 fix). For default [0,1,2] the replayed string equals the
+# re-composed default (no-op-equivalent); for user overrides it faithfully
+# restores the user value.
 state_status_format_restore() {
 	local indices n val
 	tmux_unset_opt status-format

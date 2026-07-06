@@ -52,11 +52,19 @@ activate_main() {
 
 	# --- STEP 2 (PRD §6.2 / §9): save original state into @livepicker-orig-* ---
 	# Three display-message captures (NOT option reads -> direct set-option -g,
-	# NOT tmux_save_opt). Resolved against the current client (under run-shell the
-	# user pressed the prefix key, so a client exists).
-	tmux set-option -g "$ORIG_SESSION" "$(tmux display-message -p '#{session_name}')"
-	tmux set-option -g "$ORIG_WINDOW"   "$(tmux display-message -p '#{window_id}')"      # @N id, NOT index
-	tmux set-option -g "$ORIG_LAYOUT"   "$(tmux display-message -p '#{window_layout}')"
+	# NOT tmux_save_opt). CLIENT-AWARE (H1 fix): resolved against the INVOKING
+	# client via lp_client_format. The context-free `display-message -p
+	# '#{session_name}'` returns the SERVER's last-active session, NOT reliably
+	# the attached client's — a stale pointer (any session created/switched after
+	# the client's last interaction, e.g. continuum/resurrect auto-restore at
+	# startup) would capture the wrong driver, and confirm would then operate on
+	# the wrong session (data-loss blast radius). lp_resolve_client picks the
+	# invoking client (MRU under run-shell); display-message -t <client> makes
+	# session_name/window_id/window_layout resolve against THAT client. Falls back
+	# to the context-free form on the detached/test edge (no client attached).
+	tmux set-option -g "$ORIG_SESSION" "$(lp_client_format '#{session_name}')"
+	tmux set-option -g "$ORIG_WINDOW"   "$(lp_client_format '#{window_id}')"      # @N id, NOT index
+	tmux set-option -g "$ORIG_LAYOUT"   "$(lp_client_format '#{window_layout}')"
 	# Three ordinary option reads (orig_name == src_name -> tmux_save_opt idiom).
 	tmux_save_opt key-table key-table
 	tmux_save_opt status status
@@ -89,9 +97,11 @@ activate_main() {
 		# The current token is the live session:window_index in the SAME format
 		# the list emits -> exact string match. ORIG_WINDOW is the @N id, NOT the
 		# index, so the index must come from display-message (client present at
-		# activation). (research FINDING 4/5)
+		# activation). CLIENT-AWARE (H1 fix): use lp_client_format so the token
+		# resolves against the invoking client, not the server's last-active
+		# session (research FINDING 4/5).
 		list="$(tmux list-windows -a -F '#{session_name}:#{window_index}' 2>/dev/null)"
-		current="$(tmux display-message -p '#{session_name}:#{window_index}')"
+		current="$(lp_client_format '#{session_name}:#{window_index}')"
 	else
 		# Session mode: one name per line, tmux default order (NO MRU — PRD §2
 		# non-goals). $() strips the trailing newline so the stored value has
@@ -189,13 +199,41 @@ activate_main() {
 	# (1) COPY prefix + root -> livepicker via source-file (tmux's own parser
 	# re-binds each line; the sed rewrites ONLY the first `-T <table>` which is
 	# always the table spec). Skip next/prev keys (FINDING 4 skip pattern).
+	#
+	# H3 FIX — exclude HARMFUL copied bindings. The naive copy-all imports every
+	# tmux default root binding + every user binding, including many that break
+	# the plugin's two core guarantees:
+	#   - SESSION/WINDOW-SWITCHING (break Invariant A — "browsing must not change
+	#     the client's session"; fires client-session-changed -> history
+	#     pollution): switch-client, next/previous-window, select-window -n/-p,
+	#     choose-tree, etc.
+	#   - STATE-MUTATING (break "display-only preview" PRD §7; the linked window
+	#     is a SHARED object so mutations damage the SOURCE session and are NOT
+	#     restored on exit): next-layout, kill-window/pane, split-window,
+	#     swap-pane/window, resize-pane, rename-session/window, new-window/session.
+	# The copy is therefore FILTERED: any binding whose command mentions one of
+	# these harmful targets is dropped from the copy. The explicit picker keys
+	# bound in (2) below run AFTER the copy and OVERRIDE any same-key binding, so
+	# a harmful binding dropped here does not leave its key inert — the explicit
+	# picker binds cover the keys the user actually needs (typing/nav/confirm/cancel).
+	# Non-harmful user bindings (e.g. custom display-menu, capture-pane) are still
+	# copied through, preserving PRD §8's intent ("rest of their keybinds keep
+	# working") for keys that do not endanger the invariants.
+	#
+	# L3 FIX — the next/prev key skip uses a FIXED-STRING match (grep -F) per key
+	# rather than a single ERE interpolating the key values, so a user-set
+	# @livepicker-next-key containing regex metacharacters (`.`, `*`, `+`, `[`)
+	# is treated literally and cannot mis-skip / double-bind.
 	lp_key="$(opt_next_key)"
 	lp_keys="$(opt_prev_key)"
 	lp_tf="$(mktemp)"
 	{
 		tmux list-keys -T prefix 2>/dev/null | sed 's/-T prefix/-T livepicker/'
 		tmux list-keys -T root   2>/dev/null | sed 's/-T root/-T livepicker/'
-	} | grep -vE -- "-T livepicker[[:space:]]+(${lp_key}|${lp_keys})([[:space:]]|$)" > "$lp_tf"
+	} | lp_filter_harmful_bindings \
+		| grep -vF -e "-T livepicker ${lp_key} " -e "-T livepicker ${lp_keys} " \
+			-e "-T livepicker -r ${lp_key} " -e "-T livepicker -r ${lp_keys} " \
+			> "$lp_tf"
 	tmux source-file "$lp_tf"
 	rm -f "$lp_tf"
 
@@ -274,7 +312,18 @@ activate_main() {
 	# its rc is non-fatal under no-set-e (best-effort draw — mode is already on).
 	local orig_session
 	orig_session="$(get_state "$ORIG_SESSION" "")"
-	"$CURRENT_DIR/preview.sh" "$orig_session" || return 1
+	# L2 FIX: if the first preview fails, roll back the half-applied picker state
+	# (status grow / key-table switch / hook clear / copied key bindings) by calling
+	# restore cancel BEFORE returning. Without this, mode stays off (re-activatable)
+	# but the mutated status/key-table/hook remain, and a re-activation would
+	# re-save THAT mutated state as the "original" baseline -> corrupt restore.
+	# restore cancel tears down cleanly and switches the client back to ORIG_SESSION
+	# (a same-session switch, deduped by the history engine -> 0 net entries). The
+	# `|| true` ensures a failure inside restore cannot mask the original error.
+	if ! "$CURRENT_DIR/preview.sh" "$orig_session"; then
+		"$CURRENT_DIR/restore.sh" cancel 2>/dev/null || true
+		return 1
+	fi
 	set_state "$STATE_MODE" "on"
 	tmux refresh-client -S
 	return 0

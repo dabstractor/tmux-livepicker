@@ -151,6 +151,48 @@ teardown_socket() {
 	[ -n "${TMUX_SOCKET_PATH:-}" ] && rm -f "$TMUX_SOCKET_PATH" 2>/dev/null || true
 }
 
+# lp_sweep_orphans — kill orphaned tmux -L test servers + remove their socket
+# files left behind by prior killed/interrupted test runs (M4 hygiene fix). The
+# shipped suite is slow (~2-3 min) and frequently interrupted mid-run, which
+# skips teardown_socket and leaks `lp-*`/`livepicker-test-*` servers that consume
+# memory indefinitely. This sweeps them WITHOUT touching the user's real server
+# (the real server runs on the `default` socket with no -L flag, so it is never
+# matched by the `tmux -L (lp-|livepicker-test-)` pattern). Idempotent + safe.
+# Uses $REAL_TMUX (absolute) to bypass any PATH shim.
+lp_sweep_orphans() {
+	local tmux_bin="${REAL_TMUX:-/usr/bin/tmux}"
+	local sock_dir line name sock
+	sock_dir="${TMPDIR:-/tmp}/tmux-$(id -u)"
+	local line name sock
+	# Kill orphaned servers first (so their socket files are releasable). Walk
+	# live tmux processes; match `tmux -L <lp-|livepicker-test-...>`. pgrep -af gives
+	# the full command line (avoids SC2009 ps|grep).
+	while IFS= read -r line; do
+		[ -n "$line" ] || continue
+		# Extract the socket name following `-L`. Word-split the command line.
+		# shellcheck disable=SC2086
+		set -- $line
+		while [ "$#" -gt 0 ]; do
+			if [ "$1" = "-L" ] && [ "$#" -gt 1 ]; then
+				name="$2"
+				case "$name" in
+					lp-*|livepicker-test-*)
+					sock="$sock_dir/$name"
+					"$tmux_bin" -L "$name" kill-server 2>/dev/null || true
+					rm -f "$sock" 2>/dev/null || true
+					;;
+				esac
+				shift 2
+				continue
+			fi
+			shift
+		done
+	done < <(pgrep -af 'tmux .* -L (lp-|livepicker-test-)' 2>/dev/null)
+	# Also remove any leftover orphan socket files whose server already exited.
+	[ -d "$sock_dir" ] && find "$sock_dir" -maxdepth 1 -type s \
+		\( -name 'lp-*' -o -name 'livepicker-test-*' \) -delete 2>/dev/null || true
+}
+
 # attach_test_client [session] — OPTIONAL, socket-bound convenience for
 # downstream tests (P1.M7.T3-T6) that need an attached client (switch-client /
 # display-message -p / refresh-client -S all REQUIRE one — FINDING 7). NOT

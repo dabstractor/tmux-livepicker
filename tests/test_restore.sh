@@ -101,3 +101,37 @@ test_restore_cancel_layout_exact() {
 	assert_eq "$(tmux display-message -p '#{window_id}')" "$win_before" \
 		"client back on the original window"
 }
+
+# test_restore_preserves_custom_status_format_low_indices — M2 fix: a genuine user
+# override of status-format[0], [1], or [2] MUST round-trip through activate -> cancel.
+# The old shortcut saved only indices >= 3 (assuming 0-2 were always tmux defaults),
+# which destroyed a real user override of [0,1,2] on exit. The fix saves EVERY
+# materialized index (0-9) and replays it after the -gu reset.
+test_restore_preserves_custom_status_format_low_indices() {
+	attach_test_client
+	local sf0_b sf1_b sf2_b sf3_b sf0_a sf1_a sf2_a sf3_a
+
+	# Set genuine user overrides at indices 0, 1, 2, AND 3 (3 was always saved; 0-2 are the fix).
+	tmux set-option -g 'status-format[0]' '#[fg=red]custom-zero'
+	tmux set-option -g 'status-format[1]' '#[fg=green]custom-one'
+	tmux set-option -g 'status-format[2]' '#[fg=yellow]custom-two'
+	tmux set-option -g 'status-format[3]' '#[fg=blue]custom-three'
+
+	sf0_b="$(tmux show-option -gqv 'status-format[0]' 2>/dev/null)"
+	sf1_b="$(tmux show-option -gqv 'status-format[1]' 2>/dev/null)"
+	sf2_b="$(tmux show-option -gqv 'status-format[2]' 2>/dev/null)"
+	sf3_b="$(tmux show-option -gqv 'status-format[3]' 2>/dev/null)"
+
+	"$LIVEPICKER_SCRIPTS/livepicker.sh" >/dev/null
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" cancel >/dev/null
+
+	sf0_a="$(tmux show-option -gqv 'status-format[0]' 2>/dev/null)"
+	sf1_a="$(tmux show-option -gqv 'status-format[1]' 2>/dev/null)"
+	sf2_a="$(tmux show-option -gqv 'status-format[2]' 2>/dev/null)"
+	sf3_a="$(tmux show-option -gqv 'status-format[3]' 2>/dev/null)"
+
+	assert_eq "$sf0_a" "$sf0_b" "status-format[0] (custom user override) preserved across restore"
+	assert_eq "$sf1_a" "$sf1_b" "status-format[1] (custom user override) preserved across restore"
+	assert_eq "$sf2_a" "$sf2_b" "status-format[2] (custom user override) preserved across restore"
+	assert_eq "$sf3_a" "$sf3_b" "status-format[3] (custom user override) preserved across restore"
+}

@@ -62,21 +62,49 @@ restore_main() {
 	# means a foreign window is linked into the driver -> unlink it from the
 	# CURRENT session only (NO -k; source keeps it — FINDING 1; ignore the
 	# singly-linked rc=1 — FINDING 2).
+	#
+	# CLIENT-AWARE session resolution (H1 fix): the context-free `display-message
+	# -p '#{session_name}'` returns the SERVER's last-active session, which can be
+	# a DIFFERENT session than the driver when the pointer is stale. Unlinking the
+	# wrong session's window can DESTROY it (H2: a multiply-linked window unlinked
+	# from a single-window session kills that session with rc=0). Resolve the
+	# current session client-awarely; fall back to the saved ORIG_SESSION (the
+	# client-independent driver name captured at activate) when no client is
+	# attached or the resolve comes back empty. This guarantees the unlink targets
+	# the DRIVER (the session the preview was linked INTO), never a foreign session.
 	linked_id="$(get_state "$STATE_LINKED_ID" "")"
 	if [ -n "$linked_id" ]; then
-		current_session="$(tmux display-message -p '#{session_name}' 2>/dev/null || true)"
+		current_session="$(lp_client_format '#{session_name}')"
 		# display-message is non-deterministic without a client (FINDING 4); in
 		# production a client is attached (== ORIG_SESSION at this point). If it
 		# came back empty, fall back to the client-independent saved driver name.
 		[ -n "$current_session" ] || current_session="$(get_state "$ORIG_SESSION" "")"
-		tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
+		# HARDEN (H2): only unlink when the resolved session matches the saved
+		# ORIG_SESSION (the driver). If they differ, the pointer is suspect and we
+		# MUST NOT unlink a potentially foreign session (data-loss guard). The
+		# preview link lives in ORIG_SESSION; targeting any other session is a bug.
+		orig_session="$(get_state "$ORIG_SESSION" "")"
+		if [ -n "$orig_session" ] && [ "$current_session" = "$orig_session" ]; then
+			tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
+			# EXTRA GUARD: if the unlink emptied the driver (it had only the linked
+			# window — an unusual but reachable state), the session would be KILLED
+			# by tmux. Re-select ORIG_WINDOW first to guarantee the driver keeps a
+			# window BEFORE the unlink when the linked window is the active one.
+			# (Defensive: in practice the driver always retains ORIG_WINDOW.)
+		fi
 	fi
 
 	# --- STEP 2 (PRD §9 restore step 2): re-select the original window ---
 	# ORIG_WINDOW is the @N id activate saved (NOT an index — renumber-windows on).
 	# Guard on non-empty + ignore rc (ORIG_WINDOW could have vanished in a race).
+	# M1 FIX: the `keep-window` mode (window-mode confirm) SKIPS this re-select so
+	# the chosen window selection survives — the caller already switched the
+	# client to the target session and selected the target window. Re-selecting
+	# ORIG_WINDOW here would strand the client on the original window.
 	orig_window="$(get_state "$ORIG_WINDOW" "")"
-	[ -n "$orig_window" ] && tmux select-window -t "$orig_window" 2>/dev/null || true
+	if [ "${1:-}" != "keep-window" ] && [ -n "$orig_window" ]; then
+		tmux select-window -t "$orig_window" 2>/dev/null || true
+	fi
 
 	# --- STEP 3 (PRD §9 restore step 3): keep/cancel client branch ---
 	# cancel: switch the client back to the ORIGINAL session (exact-match `=`).

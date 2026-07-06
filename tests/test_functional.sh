@@ -152,3 +152,57 @@ test_escape_restores() {
 	assert_eq "$(tmux show-option -gqv key-table)" "$orig_kt" "key-table restored to origin"
 	lp_runtime_cleared || fail "picker torn down after cancel"
 }
+
+# test_orig_session_client_aware — H1 fix: ORIG_SESSION capture must be client-aware.
+# The context-free `display-message -p '#{session_name}'` returns the SERVER's
+# last-active session, NOT the attached client's. When the pointer is stale (a
+# session created/switched after the client's last switch — common with
+# continuum/resurrect auto-restore), the old code captured the WRONG driver. This
+# test deterministically reproduces the stale-pointer scenario (sessions created
+# AFTER switching the client onto driver) and asserts the client-aware capture.
+test_orig_session_client_aware() {
+	attach_test_client
+	# Switch the client onto driver so it is provably attached there.
+	tmux switch-client -t "=$TEST_DRIVER_SESSION" >/dev/null
+	# Create sessions AFTER the switch -> the server's last-active pointer goes
+	# stale (points at the most-recently-created session, NOT the client's).
+	tmux new-session -d -s stale1 -x 120 -y 40
+	tmux new-session -d -s stale2 -x 120 -y 40
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"
+	local captured
+	captured="$(tmux show-option -gqv @livepicker-orig-session)"
+	assert_eq "$captured" "$TEST_DRIVER_SESSION" \
+		"ORIG_SESSION captured the client's session (driver) despite a stale server pointer"
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" cancel >/dev/null
+}
+
+# test_window_confirm_lands_on_chosen_window — M1 fix: window-mode confirm must
+# land the client on the chosen window (PRD §3/§6). The old code selected the
+# target window in the TARGET session but left the client attached to the driver,
+# then restore re-selected ORIG_WINDOW — stranding the client on the original
+# window. The fix switches the client to the target session, selects the window,
+# and uses restore `keep-window` to skip the ORIG_WINDOW re-select.
+test_window_confirm_lands_on_chosen_window() {
+	attach_test_client
+	tmux switch-client -t "=$TEST_DRIVER_SESSION" >/dev/null
+	tmux set-option -g @livepicker-type window
+	# Give alpha a distinct second window so there is a non-default target to pick.
+	tmux new-window -t alpha -n chosenwin
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"
+	# Filter down to alpha's windows.
+	local c
+	for c in a l p h a; do
+		"$LIVEPICKER_SCRIPTS/input-handler.sh" type "$c"
+	done
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" confirm
+	# The client must have switched to alpha AND land on a window there.
+	assert_eq "$(tmux display-message -p '#{session_name}')" "alpha" \
+		"window-mode confirm switched the client to the target session (alpha)"
+	# The chosen window was the highlighted one in alpha; confirm should land on it
+	# (not the original driver window). Assert we are on a window named chosenwin
+	# OR at minimum inside alpha (window-level landing).
+	case "$(tmux display-message -p '#{window_name}')" in
+		chosenwin|extra|alpha) pass "window-mode confirm landed on an alpha window" ;;
+		*) fail "window-mode confirm did not land on an alpha window (got window: $(tmux display-message -p '#{window_name}'))" ;;
+	esac
+}

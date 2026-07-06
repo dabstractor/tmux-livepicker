@@ -49,6 +49,10 @@ shopt -u nullglob
 tests="$(compgen -A function | grep '^test_' | sort)"
 
 # (d)(e) Per-test fresh-socket cycle.
+# Sweep orphaned test servers/sockets from prior interrupted runs FIRST (M4
+# hygiene) so a clean run does not accumulate debris, and again at the end.
+lp_sweep_orphans 2>/dev/null || true
+trap 'lp_sweep_orphans 2>/dev/null || true' EXIT
 passed=0
 failed=0
 total=0

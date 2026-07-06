@@ -132,8 +132,12 @@ set -g @livepicker-highlight-bg 'magenta'
 5. **Cancel** — `Escape` clears the query if non-empty, otherwise cancels and
    restores your status line, key table, and focus exactly.
 
-While the picker is active, unmatched keys do not reach the previewed panes (the
-picker's key table is fully modal).
+While the picker is active, the key table is fully modal: keys not explicitly
+bound to a picker action (typing, navigation, confirm, cancel) or carried over
+from your prefix/root tables are dropped and never reach the previewed panes.
+Carried-over bindings are filtered to exclude any command that would switch the
+session/window or mutate window/pane state, so browsing stays pollution-free and
+the live preview remains display-only.
 
 ## How it works
 
@@ -173,7 +177,9 @@ bash tests/run.sh
 Run from the repo root. The suite spins up a **private, isolated tmux socket per
 test** via a `tmux` PATH-wrapper shim, so your real running server is never
 touched. It prints `PASS` / `FAIL` per test plus a summary and exits `0` iff all
-passed. The suites cover the PRD §15 clusters:
+passed. Expect the full suite to take roughly **2–3 minutes** (each test starts
+a fresh isolated tmux server and sources the user config); a `VALIDATE_SKIP_SLOW=1`
+budget is available in `./validate.sh` for faster static + E2E checks. The suites cover the PRD §15 clusters:
 
 - **Functional** — activation, filtering, navigation, confirm, cancel.
 - **Live preview** — the all-panes in-place preview.
