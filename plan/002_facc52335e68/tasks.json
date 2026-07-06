@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "§17 Theme-matched tabs (window-status format reuse)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Add the window-status tab-style path: activation resolves the theme's two window-status formats against a sentinel window and caches the rendered templates; the renderer emits them with the session name swapped in, falling back to plain on any failure. Self-contained: the feature is off by default (@livepicker-tab-style plain), so the existing plain path is untouched.",
           "tasks": [
             {
@@ -65,14 +65,14 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "renderer.sh: window-status render path with plain fallback",
-              "status": "Ready",
+              "status": "Complete",
               "description": "In render(), add a window-status render branch: when opt_tab_style == window-status AND both template cache keys are non-empty, render each item through the cached template (current for highlighted, inactive for others) with the placeholder name swapped to the session name, joined by window-status-separator. Fall back to the existing plain path verbatim on any missing/empty/failure. Keep the renderer pure and fast (option reads + string replace only; NO display-message here).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Window-status render branch with placeholder swap and plain fallback",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1",
@@ -100,14 +100,14 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "options.sh + state.sh: add preview-defer accessor and sequence/target state keys",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add opt_preview_defer() to options.sh and the @livepicker-preview-seq counter + @livepicker-preview-target runtime state keys to state.sh, wiring them into clear_all_state. These back the supersede mechanism: the handler bumps the seq when it fires a preview; the background job captures the seq at fire time and preview.sh re-reads it before mutating.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Add opt_preview_defer() accessor and STATE_PREVIEW_SEQ / STATE_PREVIEW_TARGET state keys",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: codebase_state.md §1/§2 document the patterns (same as P1.M1.T1.S1). external_tmux_behavior.md Q6 documents the supersede pattern: a monotonic sequence number in a @livepicker-* option, captured at fire time, re-checked by the background job before mutating. system_context.md §3 Q3 confirms preview-defer default is `on` and the seq guard is active when on; `off` restores synchronous. The seq must be initialized to 0 at activation (in livepicker.sh, alongside the other state inits).\n2. INPUT: scripts/options.sh (get_opt, accessor block) and scripts/state.sh (STATE_* block, _STATE_RUNTIME_KEYS, set_state/get_state). No new dependency.\n3. LOGIC: In options.sh add after opt_tab_style(): `opt_preview_defer() { get_opt \"@livepicker-preview-defer\" \"on\"; }`. In state.sh add two readonly constants: `readonly STATE_PREVIEW_SEQ=\"@livepicker-preview-seq\"` and `readonly STATE_PREVIEW_TARGET=\"@livepicker-preview-target\"`, then append `$STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET` to _STATE_RUNTIME_KEYS (line 49) so clear_all_state clears them. Also: in livepicker.sh activate_main, during the state-init region (STEP 2 / the T2 list-build area, ~line 82 where STATE_LINKED_ID is initialized to empty), add `set_state \"$STATE_PREVIEW_SEQ\" \"0\"` to initialize the counter to 0 at activation.\n4. OUTPUT: opt_preview_defer() returns 'on' or 'off'. STATE_PREVIEW_SEQ (an incrementing integer) and STATE_PREVIEW_TARGET (a session/window token) are readable/writable via set_state/get_state and cleared on exit. Consumed by P1.M2.T2.S1 (seq guard in preview.sh) and P1.M2.T3.S1 (bump + fire in input-handler.sh).\n5. DOCS: none — internal accessor and state keys (the option row is covered by the Mode-B README task P1.M3.T3.S1).",
@@ -123,14 +123,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "preview.sh: supersede/sequence guard + background-safe entry",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add an optional second arg preview.sh <session> <expected_seq>. When provided, read the live @livepicker-preview-seq at the top of preview_main and if it differs, return 0 without unlinking/linking/selecting (a stale job must never clobber the current link). When called with one arg (activation first-preview and preview-defer off synchronous path), behave exactly as today. Also re-read linked-id inside the body so a job that raced a newer link does not unlink the newer window.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Add expected_seq arg and supersede guard to preview_main",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S1"
