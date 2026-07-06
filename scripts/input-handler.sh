@@ -60,9 +60,48 @@ source "$CURRENT_DIR/state.sh"
 # shellcheck source=filter.sh
 source "$CURRENT_DIR/filter.sh"
 
+# _confirm_land_on_session TARGET — the shared "switch to a chosen session and
+# tear down to leave the client there" sequence. Called by BOTH the session-mode
+# target path and the create-on-success path in the confirm branch below.
+#
+# CRITICAL (research FINDING 1/2 — the catastrophic bug this helper exists to
+# prevent): during browsing preview.sh linked the candidate's window into the
+# DRIVER (@livepicker-orig-session), tracked in @livepicker-linked-id. restore.sh
+# STEP-1 unlinks current_session:$linked_id — so if we switch-client FIRST,
+# current_session becomes the TARGET and restore would unlink the target's OWN
+# window and destroy the session. We therefore unlink the DRIVER's preview window
+# (ORIG_SESSION:$linked_id) BEFORE the switch. restore's redundant STEP-1 unlink
+# then targets target:$linked_id (a singly-linked origin) and fails harmlessly
+# (rc=1, swallowed). Verified live (research SCENARIO TEST B).
+#
+# CRITICAL (research FINDING 3): ONLY call this from a branch that switches the
+# client. Window mode and cancel issue no switch -> leave cleanup to restore.
+_confirm_land_on_session() {
+	local tgt="${1:-}"
+	local orig_session linked_id
+	orig_session="$(get_state "$ORIG_SESSION" "")"
+	linked_id="$(get_state "$STATE_LINKED_ID" "")"
+	# Drop the DRIVER's preview window BEFORE the switch (FINDING 1/2). unlink-window
+	# WITHOUT -k removes ONE link; the source session KEEPS its window (preview.sh
+	# FINDING 1). Singly-linked edge rc=1 is swallowed (preview.sh FINDING 2). Empty
+	# linked_id (self-session was last previewed, or preview never ran) -> skip.
+	if [ -n "$linked_id" ]; then
+		tmux unlink-window -t "$orig_session:$linked_id" 2>/dev/null || true
+	fi
+	# The ONE session switch (PRD §4/§6/§14). exact-match = (FINDING 8); guard a
+	# vanished session. Fires client-session-changed ONCE — the engine dedups a
+	# same-session switch to 0 entries (FINDING 7), so no special-case is needed.
+	tmux switch-client -t "=$tgt" 2>/dev/null || true
+	# Tear down the picker (status/key-table/layout/hook/state) but LEAVE the client
+	# on the target — keep does NOT switch again (P1.M5.T2.S1 restore contract).
+	# restore STEP-1's redundant unlink (target:$linked_id) fails harmlessly; STEP-6
+	# clear_all_state clears STATE_LINKED_ID + every @livepicker-* key.
+	"$CURRENT_DIR/restore.sh" keep
+}
+
 # argv[1] = action; argv[2] = the typed char (for `type`). Dispatch + act.
 input_main() {
-	local action char new_filter cur_filter cur_list cur_index L new_idx target
+	local action char new_filter cur_filter cur_list cur_index L new_idx target pick_type query
 	local -a filtered=()
 	action="${1:-}"
 
@@ -185,6 +224,74 @@ input_main() {
 		# session mode + @livepicker-create on: new-session -d -s "<query>"; switch.
 		# window mode: select-window -t "<session>:<window>". Then restore.sh keep.
 		confirm)
+			# --- P1.M6.T3.S1: resolve the highlighted item and LAND on it. This is
+			#     the ONE branch in the whole flow that calls switch-client (PRD §4/
+			#     §6/§14; Invariant A). Research FINDING 9: confirm takes argv[1]
+			#     ONLY — it MUST NOT reference $2 (set -u).
+			# Re-filter via the SAME function the renderer/nav use (T2.S1 shared
+			# filter) so target == the session the renderer is highlighting.
+			pick_type="$(opt_type)"
+			cur_list="$(get_state "$STATE_LIST" "")"
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			mapfile -t filtered < <(lp_build_filtered "$cur_list" "$cur_filter")
+			L="${#filtered[@]}"
+			# Sanitize the stored index (a STRING option; mirror nav T2.S1).
+			cur_index="$(get_state "$STATE_INDEX" "0")"
+			[[ "$cur_index" =~ ^[0-9]+$ ]] || cur_index=0
+			if [ "$L" -gt 0 ]; then
+				# Clamp into range (matches the renderer's clamp; nav keeps index
+				# valid — this guards a stale value after an external list shrink).
+				[ "$cur_index" -ge "$L" ] && cur_index=$(( L - 1 ))
+				target="${filtered[$cur_index]}"
+			else
+				target=""
+			fi
+			if [ -n "$target" ]; then
+				if [ "$pick_type" = "window" ]; then
+					# Window mode (PRD §6/§15.22; FINDING 6/8). target is ALREADY a
+					# full "session:window_index" token (livepicker.sh builds the
+					# list that way) -> pass it straight to select-window. NO
+					# switch-client, NO creation, NO driver-preview unlink (FINDING
+					# 3: no switch => current_session stays == driver => restore
+					# STEP-1 cleans the link correctly). CAVEAT (FINDING 8, known
+					# MVP limitation): restore keep's STEP-2 re-selects ORIG_WINDOW
+					# in the driver, so a window confirm tears down to ORIG_WINDOW.
+					# restore.sh is immutable (P1.M5 COMPLETE); this implements the
+					# literal contract. The work-item MOCKING asserts only "no
+					# creation".
+					tmux select-window -t "$target" 2>/dev/null || true
+					"$CURRENT_DIR/restore.sh" keep
+				else
+					# Session mode: the helper unlinks the driver preview BEFORE
+					# switch-client (FINDING 1/2 — load-bearing), switches once,
+					# and tears down with restore keep.
+					_confirm_land_on_session "$target"
+				fi
+				return 0
+			fi
+			# Empty filtered list.
+			if [ "$pick_type" = "session" ] && [ "$(opt_create)" = "on" ]; then
+				query="$cur_filter"
+				# Robust create gate (FINDING 4/5). new-session SILENTLY SANITIZES
+				# names (':'->'_', leading '.'->'_') and returns rc=0 with a
+				# DIFFERENT name, so checking rc alone would strand the client
+				# (switch-client -t "=.hidden" -> rc=1, no such session). Require
+				# BOTH new-session rc=0 AND the EXACT $query name to now exist
+				# (has-session exact-match =). A duplicate cannot occur here: if
+				# an exact-$query session existed it would be a case-insensitive
+				# match -> in the filtered list -> this branch is never reached.
+				# Empty query -> new-session rc=1 -> gate false -> cancel.
+				if tmux new-session -d -s "$query" 2>/dev/null && tmux has-session -t "=$query" 2>/dev/null; then
+					_confirm_land_on_session "$query"
+				else
+					# Invalid/sanitized/empty name -> cancel (PRD §6 Confirm).
+					"$CURRENT_DIR/restore.sh" cancel
+				fi
+				return 0
+			fi
+			# Window mode, OR session mode with @livepicker-create off: nothing to
+			# create -> cancel (PRD §6/§15.22).
+			"$CURRENT_DIR/restore.sh" cancel
 			return 0
 			;;
 		# --- P1.M6.T4.S1 seam: cancel ---
