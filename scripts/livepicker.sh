@@ -155,6 +155,12 @@ activate_main() {
 	# Init the linked-preview id (no preview linked yet). preview.sh reads this
 	# via get_state "$STATE_LINKED_ID" "" — empty means no prior link to unlink.
 	set_state "$STATE_LINKED_ID" ""
+	# Init the deferred-preview supersede counter (PRD §18 / external_tmux_behavior.md
+	# Q6). Monotonic from 0; bumped by the fire helper (P1.M2.T3) and re-checked by
+	# preview.sh (P1.M2.T2) so a late/superseded -b job is a no-op. clear_all_state
+	# clears it on exit (via _STATE_RUNTIME_KEYS); this init is the authoritative
+	# reset for the fresh session.
+	set_state "$STATE_PREVIEW_SEQ" "0"
 
 	# --- T2 (P1.M4.T2.S1): build session/window list + initial selection ---
 	# PRD §6 Activation step 3 (build the list) + step 6's initial-selection

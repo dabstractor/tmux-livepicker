@@ -45,6 +45,8 @@ readonly STATE_LINKED_ID="@livepicker-linked-id"
 readonly STATE_TYPE="@livepicker-type"   # session|window — ALIAS of PRD §11 config (read-only; NEVER cleared)
 readonly STATE_TAB_CURRENT_TMPL="@livepicker-tab-current-tmpl"   # cached window-status-current-format (PRD §17; written P1.M1.T2, read P1.M1.T3; cleared via _STATE_RUNTIME_KEYS)
 readonly STATE_TAB_INACTIVE_TMPL="@livepicker-tab-inactive-tmpl" # cached window-status-format         (PRD §17; written P1.M1.T2, read P1.M1.T3; cleared via _STATE_RUNTIME_KEYS)
+readonly STATE_PREVIEW_SEQ="@livepicker-preview-seq"        # monotonic supersede counter (PRD §18; external_tmux_behavior.md Q6): bumped by the fire helper (P1.M2.T3), re-checked by preview.sh (P1.M2.T2) before mutating; init 0 at activate; cleared via _STATE_RUNTIME_KEYS
+readonly STATE_PREVIEW_TARGET="@livepicker-preview-target"  # latest session/window token (PRD §18): written by the fire helper (P1.M2.T3), read/rechecked by preview.sh (P1.M2.T2); cleared via _STATE_RUNTIME_KEYS
 
 # --- saved-state CONTRACT keys (PRD §9; written by activate, read by restore) ---
 readonly ORIG_SESSION="@livepicker-orig-session"
@@ -58,7 +60,7 @@ readonly ORIG_STATUS_FORMAT_INDICES="@livepicker-orig-status-format-indices"
 readonly ORIG_STATUS_FORMAT_PREFIX="@livepicker-orig-status-format-"   # +N suffix (bracket-free)
 
 # keys clear_all_state unsets explicitly (STATE_TYPE deliberately absent: it is config)
-readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL"
+readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET"
 
 # $1: STATE_* key, $2: value. Writes a runtime @livepicker-* option (delegates to
 # utils tmux_set_opt). Caller passes a STATE_* constant, not a raw string.
