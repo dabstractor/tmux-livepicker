@@ -1,0 +1,47 @@
+h1.0 tmux-livepicker: Product Requirements Document
+ h2.0 0. Prior attempt (remove this section after implementation)
+ h2.1 1. Overview
+ h2.2 2. Goals and non-goals
+  h3.0 Goals
+  h3.1 Non-goals
+ h2.3 3. User stories
+ h2.4 4. The core rule: preview without switching
+ h2.5 5. Architecture
+  h3.2 Data flow
+ h2.6 6. Behaviors
+  h3.3 Activation
+  h3.4 Filtering
+  h3.5 Session navigation
+  h3.6 Confirm
+  h3.7 Cancel
+ h2.7 7. The preview subsystem (live, all panes)
+  h3.8 Mechanism: link-window plus select-window
+  h3.9 Fallbacks
+  h3.10 Self-session edge case
+  h3.11 Side effects to suppress
+  h3.12 Input during preview
+ h2.8 8. The repurposed-key subsystem
+  h3.13 Why this is low-cost
+  h3.14 Keys
+  h3.15 Binding
+  h3.16 Discovery (optional convenience)
+ h2.9 9. State saved and restored
+ h2.10 10. Status-line setup
+ h2.11 11. Configuration options
+ h2.12 12. File layout
+ h2.13 13. tmux primitives reference
+ h2.14 14. Pollution and compatibility analysis
+ h2.15 15. Validation
+  h3.17 Functional
+  h3.18 Pollution (the core invariant)
+  h3.19 Live all-panes preview
+  h3.20 Key repurpose
+  h3.21 Restore
+  h3.22 Create-on-enter
+  h3.23 Responsiveness
+  h3.24 Appearance (window-status hijack)
+ h2.16 16. Implementation risks and notes
+ h2.17 17. Tab appearance — reuse the window-status format
+ h2.18 18. Responsiveness — interaction-first, deferred preview
+---
+code:4 para:58 list:30 table:1 quote:1
