@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "MVP — Live session picker with zero session-history pollution",
-      "status": "Planned",
+      "status": "Ready",
       "description": "Deliver the complete tmux-livepicker core experience end-to-end: activate from the status line, grow the bar to two lines, render a filtered session list, preview the highlighted session's active window live (all panes) by linking it into the current session, navigate with repurposed window-nav keys, confirm with exactly one switch-client, cancel with perfect restoration, and never fire client-session-changed while browsing. Hardening (hook suppression, create-on-enter, self-session edge case, fallbacks) is folded into the feature milestones; a socket-isolated validation harness proves the pollution invariant. Build target: tmux 3.6b (floor documented as 3.2 for multi-line status).",
       "milestones": [
         {
@@ -783,21 +783,21 @@
           "type": "Milestone",
           "id": "P1.M8",
           "title": "Sync changeset-level documentation (Mode B)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Final cross-cutting documentation task. Whole-feature/overview docs that only make sense once the entire changeset is in place: README.md (install, config options table, usage, compatibility floor) and any overview docs. Per §5 this is a FINAL task with dependencies on every implementing subtask so it runs last.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M8.T1",
               "title": "Sync changeset-level documentation",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Author/refresh the README and overview docs summarizing the whole plugin: what it does, how to install/load it, the full @livepicker-* config options table, usage walkthrough, tmux-version compatibility floor (3.2 documented; 3.6b tested), and composition notes with sibling plugins.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M8.T1.S1",
                   "title": "README.md — overview, install, config table, usage, compatibility",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
@@ -826,7 +826,7 @@
                   "type": "Subtask",
                   "id": "P1.M8.T1.S2",
                   "title": "CHANGELOG / version note + recommend PRD §0 removal",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 0.5,
                   "dependencies": [
                     "P1.M8.T1.S1"
