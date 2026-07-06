@@ -56,23 +56,25 @@ preview_fallback() {
 	# capture-pane snapshot fallback (PRD §7 Fallbacks). Single-pane, NOT live.
 	# Invoked (a) when @livepicker-preview-mode == snapshot (always), and
 	# (b) when a live link-window fails (degraded but non-blocking path).
-	# Captures S's active pane with escapes to stdout. CRITICAL: the target is
-	# "=$1:." NOT "=$1" — the bare =$S form FAILS rc=1 "can't find pane" on
-	# 3.6b (= is a session-name matcher; capture-pane wants a pane target).
-	# Capture into a LOCAL var (not bare stdout): under run-shell, bare escape
-	# sequences could corrupt the status area. The captured text is intentionally
-	# discarded (FINDING H) — there is no separate buffer to render it into
-	# without a link (live mode's job); capturing just verifies reachability.
-	# Returns capture's rc: 0 = captured, non-zero = session/pane gone (§4).
-	local captured
+	# Captures the candidate's active pane with escapes. CRITICAL: the target is
+	# "=$target:." where $target is the session name (session mode) OR the parsed
+	# "session:index" (window mode). The bare "=$1:." form is MALFORMED in window
+	# mode: $1="multi:1" -> "=multi:1:." -> "can't find window 1:". So in window
+	# mode parse the token and build "=$w_sess:$w_idx." (the active pane of the
+	# specific window). Returns capture's rc: 0 = captured, non-zero = gone.
+	local captured target="$1"
+	if [ "$(opt_type)" = "window" ] && [ "${1%%:*}" != "$1" ]; then
+		local w_sess="${1%%:*}" w_idx="${1#*:}"
+		target="$w_sess:$w_idx"
+	fi
 	# shellcheck disable=SC2034  # best-effort hint; text intentionally unused.
-	captured="$(tmux capture-pane -ep -t "=$1:." 2>/dev/null)" && return 0 || return 1
+	captured="$(tmux capture-pane -ep -t "=$target:." 2>/dev/null)" && return 0 || return 1
 }
 
 # argv[1] = candidate session name S.
 preview_main() {
 	local S="${1:-}"
-	local current_session orig_window linked_id src_id
+	local current_session orig_window linked_id src_id w_sess w_idx
 
 	# The session we preview INSIDE (the driver). Equal to the live client session
 	# during browsing (Invariant A); client-independent (FINDING 9).
@@ -111,8 +113,21 @@ preview_main() {
 		return 0
 	fi
 
-	# Resolve S's active window id (exact-match =S; one line @N; FINDING 7).
-	src_id="$(tmux list-windows -t "=$S" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
+	# Resolve the candidate window id. SESSION mode: the session's active window
+	# (exact-match =S; one line @N; FINDING 7) — UNCHANGED. WINDOW mode: $S is a
+	# 'session:window_index' token (livepicker.sh:103); resolve the SPECIFIC window
+	# at that index, NOT the session's active window (bugfix ISSUE 4). The
+	# #{window_active} filter ignores the index, and -f '#{window_index} == N'
+	# does NOT filter (expands to non-empty text -> always truthy), so list all
+	# windows and match the index field, returning the @id (address by @id — the
+	# plugin's invariant; renumber-windows is on but the list is snapshotted).
+	if [ "$(opt_type)" = "window" ] && [ "${S%%:*}" != "$S" ]; then
+		w_sess="${S%%:*}"
+		w_idx="${S#*:}"
+		src_id="$(tmux list-windows -t "=$w_sess" -F '#{window_id}:#{window_index}' 2>/dev/null | awk -F: -v idx="$w_idx" '$2==idx {print $1; exit}')"
+	else
+		src_id="$(tmux list-windows -t "=$S" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
+	fi
 	if [ -z "$src_id" ]; then
 		# Session gone / no windows / exact-match miss -> fallback.
 		preview_fallback "$S"

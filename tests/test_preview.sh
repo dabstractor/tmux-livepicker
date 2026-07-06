@@ -161,3 +161,52 @@ test_capture_fallback() {
 	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "" \
 		"failed link leaves no linked-id"
 }
+
+# test_window_preview_shows_highlighted_window — Bugfix Issue 4: in WINDOW mode
+# the picker lists 'session:window_index' tokens (livepicker.sh:103) and preview.sh
+# is called with such a token. The candidate may be the session's NON-active window.
+# preview.sh must link the window at the given INDEX, NOT the session's active
+# window (the #{window_active} filter ignores the index). Creates a session with
+# TWO windows, dynamically detects the NON-active window's index + @id (base-index
+# may be 0 or 1 — the isolated server inherits ~/.tmux.conf; `new-window -t multi`
+# FAILS "index 1 in use" on base-index=1, so use -a + detect dynamically), calls
+# preview.sh 'multi:<non_active_index>', and asserts @livepicker-linked-id equals
+# the HIGHLIGHTED window's @id (NOT the active window's @id). Before the fix,
+# linked-id == the active window's @id (the bug). preview.sh is client-independent
+# (reads @livepicker-orig-session from state) -> NO attach_test_client.
+test_window_preview_shows_highlighted_window() {
+	lp_preview_seed_state
+	# Window mode: opt_type gates the new resolution branch. lp_preview_seed_state
+	# does NOT set type -> set it explicitly.
+	tmux set-option -g @livepicker-type window
+	# A candidate session with TWO windows. base-index may be 0 or 1 (inherited
+	# from ~/.tmux.conf); create the 2nd window with -a (append — a bare
+	# `new-window -t multi` FAILS "index 1 in use" on base-index=1). new-window
+	# makes the new window ACTIVE, so the FIRST window is NON-active.
+	tmux new-session -d -s multi -x 120 -y 40
+	tmux new-window -t multi -a -n secondwin
+	# Dynamically detect the NON-active window's index + @id (the highlight target).
+	# Space-delimited to avoid any ':' ambiguity in @ids (which are clean @N).
+	local nonactive na_idx na_id active_id
+	nonactive="$(tmux list-windows -t '=multi' -F '#{window_index} #{window_id} #{window_active}' | awk '$3==0 {print $1" "$2; exit}')"
+	na_idx="${nonactive%% *}"
+	na_id="${nonactive#* }"
+	active_id="$(tmux list-windows -t '=multi' -F '#{window_id}' -f '#{window_active}')"
+	# Sanity: the non-active window differs from the active one (proves the bug is
+	# reachable — if equal, the test would be vacuous; fail loudly on bad setup).
+	assert_contains "$na_id" "@" "non-active window resolved to a @id handle"
+	if [ "$na_id" = "$active_id" ]; then
+		fail "test setup invalid: non-active window == active window (need 2 distinct windows)"
+		return 0
+	fi
+	# Preview the NON-active window's token (session:index).
+	"$LIVEPICKER_SCRIPTS/preview.sh" "multi:$na_idx"
+	# The linked window MUST be the HIGHLIGHTED (non-active) window, NOT the
+	# session's active window. Before the fix, linked-id == active_id (the bug).
+	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "$na_id" \
+		"window-mode preview links the highlighted window (by index), not the active window"
+	# Belt-and-braces: prove it is NOT the active window's id.
+	if [ "$(tmux show-option -gqv @livepicker-linked-id)" = "$active_id" ]; then
+		fail "window-mode preview linked the ACTIVE window (the bug)"
+	fi
+}
