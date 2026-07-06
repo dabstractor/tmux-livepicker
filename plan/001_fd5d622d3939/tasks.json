@@ -528,14 +528,14 @@
               "type": "Task",
               "id": "P1.M6.T2",
               "title": "input-handler.sh: backspace + next-session + prev-session",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Backspace shrinks the filter; next/prev move the index within the filtered list with wrapping and refresh the live preview.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M6.T2.S1",
                   "title": "input-handler.sh backspace / next-session / prev-session",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M6.T1.S1",
@@ -556,14 +556,14 @@
               "type": "Task",
               "id": "P1.M6.T3",
               "title": "input-handler.sh: confirm (incl. create-on-enter)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Resolve the target from the filtered list at the current index; if present switch-client to it once (session) or select-window (window); if empty and session-mode and create is on, create the session from the query then switch; on creation failure, cancel. Then call restore keep.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M6.T3.S1",
                   "title": "input-handler.sh confirm",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M5.T1.S1",

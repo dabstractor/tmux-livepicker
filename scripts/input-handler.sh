@@ -57,10 +57,13 @@ source "$CURRENT_DIR/options.sh"
 source "$CURRENT_DIR/utils.sh"
 # shellcheck source=state.sh
 source "$CURRENT_DIR/state.sh"
+# shellcheck source=filter.sh
+source "$CURRENT_DIR/filter.sh"
 
 # argv[1] = action; argv[2] = the typed char (for `type`). Dispatch + act.
 input_main() {
-	local action char new_filter
+	local action char new_filter cur_filter cur_list cur_index L new_idx target
+	local -a filtered=()
 	action="${1:-}"
 
 	case "$action" in
@@ -96,7 +99,84 @@ input_main() {
 		# prev-session:   index = (index-1+FLEN) % FLEN (wrap); refresh preview.sh + refresh -S.
 		# (FLEN comes from re-filtering @livepicker-list by @livepicker-filter —
 		#  the same case-insensitive substring the renderer uses.)
-		backspace|next-session|prev-session)
+		backspace)
+			# --- P1.M6.T2.S1: trim the last char off the query, reset the
+			#     highlight to the top filtered match, force a status redraw.
+			# PRD §6 Filtering: "Backspace removes the last character. After
+			# each change, run tmux refresh-client -S ..." The renderer does the
+			# filtering + highlighting — the handler only trims filter/index +
+			# refresh (research FINDING 2/4).
+			# CONTRACT (work-item §3): backspace = filter+index+refresh ONLY.
+			# It does NOT call preview.sh (FINDING 4) — the top match is already
+			# shown; shortening the filter may re-admit a different top match
+			# (a known minor UX gap that re-syncs on the next nav/confirm).
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			# ${var%?} removes the shortest trailing match of one char. On an
+			# empty var it yields "" (no error, no set -u issue). Guard empty
+			# so the write is an explicit no-op when nothing is left to erase.
+			if [ -n "$cur_filter" ]; then
+				new_filter="${cur_filter%?}"
+				set_state "$STATE_FILTER" "$new_filter"
+			fi
+			# Reset the highlight to the top filtered match (PRD §6). Always
+			# safe — the renderer clamps + handles FLEN=0 itself.
+			set_state "$STATE_INDEX" "0"
+			# Force the #() renderer to re-run (PRD §10/§16). Guard the detached
+			# edge (FINDING 3; mirror the `type` branch / restore.sh STEP 6c).
+			tmux refresh-client -S 2>/dev/null || true
+			return 0
+			;;
+		next-session)
+			# --- P1.M6.T2.S1: move the highlight DOWN within the FILTERED list
+			#     (wrapping), refresh the live preview + the status renderer.
+			# PRD §6 Session navigation: "next-session ... moves @livepicker-index
+			# within the filtered list (wrapping). Each move refreshes the
+			# preview (section 7) and the status renderer. Navigation must not
+			# call switch-client." (Invariant A — PRD §4 / system_context §3.)
+			# Re-filter via the SAME function the renderer uses (work-item
+			# CONTRACT point 1; research FINDING 2/3) so L == the renderer's FLEN
+			# and filtered[new_idx] is the session the renderer will highlight.
+			cur_list="$(get_state "$STATE_LIST" "")"
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			mapfile -t filtered < <(lp_build_filtered "$cur_list" "$cur_filter")
+			L="${#filtered[@]}"
+			# Nothing matches -> no-op (never divide by zero; FINDING 5).
+			[ "$L" -eq 0 ] && return 0
+			# Sanitize the stored index to a non-negative int (it is a STRING
+			# option; FINDING 5) before the modulo.
+			cur_index="$(get_state "$STATE_INDEX" "0")"
+			[[ "$cur_index" =~ ^[0-9]+$ ]] || cur_index=0
+			# Wrap modulo L (PRD §6 "wrapping"). No +L needed for next.
+			new_idx=$(( (cur_index + 1) % L ))
+			# Set the NEW index FIRST, resolve the target at it, THEN preview +
+			# refresh (so the highlight + the live preview agree — FINDING 5).
+			set_state "$STATE_INDEX" "$new_idx"
+			target="${filtered[$new_idx]}"
+			# Delegate the live link/select to preview.sh (P1.M3; FINDING 9). It
+			# fires session-window-changed (suppressed by activate T4.S2) but
+			# NEVER client-session-changed (Invariant A). Guard a mid-nav failure
+			# (session gone) so nav still advances + redraws.
+			"$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true
+			tmux refresh-client -S 2>/dev/null || true
+			return 0
+			;;
+		prev-session)
+			# --- P1.M6.T2.S1: move the highlight UP within the FILTERED list
+			#     (wrapping, reverse). Mirror of next-session.
+			cur_list="$(get_state "$STATE_LIST" "")"
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			mapfile -t filtered < <(lp_build_filtered "$cur_list" "$cur_filter")
+			L="${#filtered[@]}"
+			[ "$L" -eq 0 ] && return 0
+			cur_index="$(get_state "$STATE_INDEX" "0")"
+			[[ "$cur_index" =~ ^[0-9]+$ ]] || cur_index=0
+			# Wrap modulo L (PRD §6). The +L dodges bash's negative-modulo quirk
+			# (bash `%` can return negatives for negative operands — FINDING 5).
+			new_idx=$(( (cur_index - 1 + L) % L ))
+			set_state "$STATE_INDEX" "$new_idx"
+			target="${filtered[$new_idx]}"
+			"$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true
+			tmux refresh-client -S 2>/dev/null || true
 			return 0
 			;;
 		# --- P1.M6.T3.S1 seam: confirm ---

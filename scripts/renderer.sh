@@ -41,12 +41,14 @@ source "$CURRENT_DIR/options.sh"
 source "$CURRENT_DIR/utils.sh"
 # shellcheck source=state.sh
 source "$CURRENT_DIR/state.sh"
+# shellcheck source=filter.sh
+source "$CURRENT_DIR/filter.sh"
 
 render() {
 	local TYPE FG BG HFG HBG SHOW_COUNT_RAW SHOW_COUNT
 	local LIST FILTER IDX
 	local -a all=() filtered=()
-	local TOTAL FLEN low_filter name low_name
+	local TOTAL FLEN
 	local out seg i cidx first
 
 	TYPE="$(opt_type)"
@@ -67,13 +69,7 @@ render() {
 	mapfile -t all < <(printf '%s' "$LIST")
 	TOTAL="${#all[@]}"
 
-	low_filter="${FILTER,,}"
-	for name in "${all[@]}"; do
-		low_name="${name,,}"
-		if [[ "$low_name" == *"$low_filter"* ]]; then
-			filtered+=("$name")
-		fi
-	done
+	mapfile -t filtered < <(lp_build_filtered "$LIST" "$FILTER")
 	FLEN="${#filtered[@]}"
 
 	out=""
