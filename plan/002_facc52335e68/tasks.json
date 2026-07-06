@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "§17 Theme-matched tabs (window-status format reuse)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Add the window-status tab-style path: activation resolves the theme's two window-status formats against a sentinel window and caches the rendered templates; the renderer emits them with the session name swapped in, falling back to plain on any failure. Self-contained: the feature is off by default (@livepicker-tab-style plain), so the existing plain path is untouched.",
           "tasks": [
             {
@@ -40,14 +40,14 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "livepicker.sh: sentinel window + format resolution + cache",
-              "status": "Researching",
+              "status": "Complete",
               "description": "At activation, when opt_tab_style == window-status: create a short-lived hidden sentinel window, resolve both window-status formats via display-message against it, cache the two rendered templates into the T1 state keys, then kill the sentinel. Runs once at activation (no per-keystroke display-message). Guards every step so a styling miss never prevents the picker from opening.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Sentinel-window format resolution and template caching in activate_main",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1"
@@ -65,14 +65,14 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "renderer.sh: window-status render path with plain fallback",
-              "status": "Planned",
+              "status": "Ready",
               "description": "In render(), add a window-status render branch: when opt_tab_style == window-status AND both template cache keys are non-empty, render each item through the cached template (current for highlighted, inactive for others) with the placeholder name swapped to the session name, joined by window-status-separator. Fall back to the existing plain path verbatim on any missing/empty/failure. Keep the renderer pure and fast (option reads + string replace only; NO display-message here).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Window-status render branch with placeholder swap and plain fallback",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1",

@@ -40,6 +40,81 @@ source "$CURRENT_DIR/utils.sh"
 # shellcheck source=state.sh
 source "$CURRENT_DIR/state.sh"
 
+# _lp_resolve_tab_templates — PRD §17: resolve the theme's window-status[-current]-format
+# against a short-lived hidden sentinel window and cache the two rendered templates, so the
+# renderer (P1.M1.T3) can emit theme-matched tabs from a #() status command (whose stdout is
+# NOT re-parsed for #{…} — only #[…] styles apply). Done ONCE at activation (fast; no
+# per-keystroke display-message). Gated on @livepicker-tab-style == window-status; in plain
+# mode it is a no-op. On ANY failure/ambiguity it leaves both cache keys SET-EMPTY (real
+# `tmux set-option -g @x ""`, NOT unset) so the renderer's tmux_is_set probe detects "resolved
+# empty" and falls back to plain (PRD §17 Fallback, §16 fragility). ALWAYS returns 0 — this
+# is a cosmetic enhancement; it must NEVER block activation. See research/
+# sentinel_resolution_findings.md (FINDING 1 new-window form, FINDING 3 never-empty value,
+# FINDING 5 set-empty contract).
+_lp_resolve_tab_templates() {
+	# plain mode (the default) -> no-op; the renderer takes the plain path regardless.
+	[ "$(opt_tab_style)" = "window-status" ] || return 0
+
+	local cur_fmt reg_fmt cur_tpl reg_tpl sent_sess
+
+	# (a) Read both format VALUES (window options -> -gwv global-window scope). NOTE: these
+	# NEVER read empty (tmux always materializes a default); the empty-check below is
+	# defensive. The real fallback is the unexpanded-'#{' check in (e). (FINDING 3)
+	cur_fmt="$(tmux show-options -gwv window-status-current-format 2>/dev/null)"
+	reg_fmt="$(tmux show-options -gwv window-status-format 2>/dev/null)"
+	if [ -z "$cur_fmt" ] || [ -z "$reg_fmt" ]; then
+		set_state "$STATE_TAB_CURRENT_TMPL" ""
+		set_state "$STATE_TAB_INACTIVE_TMPL" ""
+		return 0
+	fi
+
+	# (b) Create a unique hidden 2-window session (anchor + sentinel). CRITICAL (FINDING 1):
+	# `new-window -d -t "$sent_sess"` (bare) FAILS under base-index=1/renumber ("index in
+	# use"); the TRAILING-COLON form `-t "$sent_sess:"` picks a free slot. Force-select the
+	# anchor so __lp_tab__ is NON-active -> clean window-state specifiers. Unique name
+	# (PID+epoch) avoids a double-activation collision.
+	sent_sess="__lp_sent_$$_$(date +%s)"
+	if ! tmux new-session -d -s "$sent_sess" -n __lp_anchor__ 2>/dev/null; then
+		set_state "$STATE_TAB_CURRENT_TMPL" ""
+		set_state "$STATE_TAB_INACTIVE_TMPL" ""
+		return 0
+	fi
+	# (trailing colon = target the session; tmux appends at a free index)
+	if ! tmux new-window -d -t "$sent_sess:" -n __lp_tab__ 2>/dev/null; then
+		tmux kill-session -t "$sent_sess" 2>/dev/null || true
+		set_state "$STATE_TAB_CURRENT_TMPL" ""
+		set_state "$STATE_TAB_INACTIVE_TMPL" ""
+		return 0
+	fi
+	tmux select-window -t "$sent_sess:__lp_anchor__" 2>/dev/null || true
+
+	# (c) Resolve both formats FULLY against the non-active sentinel window. Pass the OPTION
+	# VALUE (not the literal #{window_status_current_format} — no such var). -p = stdout.
+	# Expands every #{…} incl. #{E:@user_option} and #W (-> __lp_tab__ placeholder). (Q1)
+	cur_tpl="$(tmux display-message -p -t "$sent_sess:__lp_tab__" "$cur_fmt" 2>/dev/null)"
+	reg_tpl="$(tmux display-message -p -t "$sent_sess:__lp_tab__" "$reg_fmt" 2>/dev/null)"
+
+	# (d) Kill the sentinel (tears down anchor + tab together; never leaks).
+	tmux kill-session -t "$sent_sess" 2>/dev/null || true
+
+	# (e) Guard: an unexpanded '#{' means a malformed theme (nested a format in a user-option
+	# WITHOUT #{E:…}); blank it so the renderer falls back to plain. (FINDING 4: this fires
+	# precisely for the tubular-misuse case; a plain unset @-opt resolves to empty, not '#{'.)
+	case "$cur_tpl" in *"#{"*) cur_tpl="" ;; esac
+	case "$reg_tpl" in *"#{"*) reg_tpl="" ;; esac
+
+	# (f) Cache. If EITHER is empty (resolution failed OR the guard blanked it), set BOTH
+	# empty (set-empty, NOT unset — FINDING 5: the renderer's tmux_is_set probe needs "set").
+	if [ -z "$cur_tpl" ] || [ -z "$reg_tpl" ]; then
+		set_state "$STATE_TAB_CURRENT_TMPL" ""
+		set_state "$STATE_TAB_INACTIVE_TMPL" ""
+	else
+		set_state "$STATE_TAB_CURRENT_TMPL" "$cur_tpl"
+		set_state "$STATE_TAB_INACTIVE_TMPL" "$reg_tpl"
+	fi
+	return 0
+}
+
 activate_main() {
 	# --- STEP 1 (PRD §6.1 / §16): double-activation guard ---
 	# If a picker is already active, ignore the second activation silently. This
@@ -324,6 +399,8 @@ activate_main() {
 		"$CURRENT_DIR/restore.sh" cancel 2>/dev/null || true
 		return 1
 	fi
+	# PRD §17: resolve theme tab formats once + cache (no-op in plain mode; never blocks).
+	_lp_resolve_tab_templates
 	set_state "$STATE_MODE" "on"
 	tmux refresh-client -S
 	return 0
