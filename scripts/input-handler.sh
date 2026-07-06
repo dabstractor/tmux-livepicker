@@ -128,13 +128,59 @@ _confirm_land_on_session() {
 # Empty filtered list (no matches) -> skip the preview (leave the prior pane as-is,
 # mirroring nav's `[ "$L" -eq 0 ] && return 0` guard).
 _lp_sync_preview_to_top_match() {
-	local _list _filt
+	local _list _filt _top
 	local -a _sync_filtered=()
 	_list="$(get_state "$STATE_LIST" "")"
 	_filt="$(get_state "$STATE_FILTER" "")"
 	mapfile -t _sync_filtered < <(lp_build_filtered "$_list" "$_filt")
-	[ "${#_sync_filtered[@]}" -eq 0 ] && return 0
-	"$CURRENT_DIR/preview.sh" "${_sync_filtered[0]}" 2>/dev/null || true
+	if [ "${#_sync_filtered[@]}" -eq 0 ]; then
+		_top=""
+	else
+		_top="${_sync_filtered[0]}"
+	fi
+	# Delegate redraw + (deferred | synchronous) preview to _lp_preview_follow. Empty
+	# filtered list -> _top="" -> no preview fires (leave the prior pane as-is).
+	_lp_preview_follow "$_top"
+}
+
+# _lp_fire_preview TARGET — schedule a background, supersedeable preview of TARGET
+# (PRD §18; external_tmux_behavior.md Q6). Bumps the monotonic STATE_PREVIEW_SEQ,
+# records STATE_PREVIEW_TARGET, then launches preview.sh detached via run-shell -b
+# (non-blocking — Q5). The job re-checks the seq in preview_main (P1.M2.T2.S1) and
+# NO-OPS if a newer keystroke/nav won, so a late/superseded job never clobbers the
+# current link (and clear_all_state unsets the seq on teardown -> a post-teardown
+# job reads "0" != its seq -> no-op). No-op on an empty TARGET (no top match).
+_lp_fire_preview() {
+	local target="${1:-}" seq
+	[ -z "$target" ] && return 0
+	seq="$(get_state "$STATE_PREVIEW_SEQ" "0")"
+	seq=$(( seq + 1 ))
+	set_state "$STATE_PREVIEW_SEQ" "$seq"
+	set_state "$STATE_PREVIEW_TARGET" "$target"
+	# Absolute path (the server's cwd is NOT the plugin dir); bash shebang honored
+	# under run-shell (Q5). Single-quote the target so session names with spaces
+	# survive (matches the key-binding run-shell form, livepicker.sh:326).
+	tmux run-shell -b "$CURRENT_DIR/preview.sh '$target' '$seq'"
+}
+
+# _lp_preview_follow TARGET — redraw the status line AND sync the preview to the
+# current selection, honoring @livepicker-preview-defer (PRD §18.1/§18.2). Used by
+# the nav branches (explicit TARGET) and by _lp_sync_preview_to_top_match (top match).
+# defer=on: refresh-client -S FIRST (synchronous, latency-priority status redraw),
+#   THEN the preview fires in the background (_lp_fire_preview does NO synchronous
+#   preview work — only state writes + a non-blocking -b launch).
+# defer=off (legacy): synchronous preview FIRST (one arg -> preview.sh guard skipped),
+#   THEN refresh-client -S — byte-for-byte the pre-§18 order.
+# Empty TARGET -> skip the preview, still redraw (leave the prior pane as-is).
+_lp_preview_follow() {
+	local target="${1:-}"
+	if [ "$(opt_preview_defer)" = "on" ]; then
+		tmux refresh-client -S 2>/dev/null || true
+		_lp_fire_preview "$target"
+	else
+		[ -n "$target" ] && { "$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true; }
+		tmux refresh-client -S 2>/dev/null || true
+	fi
 }
 
 # argv[1] = action; argv[2] = the typed char (for `type`). Dispatch + act.
@@ -170,9 +216,6 @@ input_main() {
 			# Sync the live preview to the new top filtered match (PRD §3 / README;
 			# mirror next/prev). Always index 0 — these branches just reset it.
 			_lp_sync_preview_to_top_match
-			# Force the #() renderer to re-run (PRD §10/§16). Requires a client
-			# (production always has one); guard the detached edge (FINDING 3).
-			tmux refresh-client -S 2>/dev/null || true
 			return 0
 			;;
 		# --- P1.M6.T2.S1 seam: backspace / next-session / prev-session ---
@@ -208,9 +251,6 @@ input_main() {
 			# Sync the live preview to the new top filtered match (PRD §3 / README;
 			# mirror next/prev). Always index 0 — these branches just reset it.
 			_lp_sync_preview_to_top_match
-			# Force the #() renderer to re-run (PRD §10/§16). Guard the detached
-			# edge (FINDING 3; mirror the `type` branch / restore.sh STEP 6c).
-			tmux refresh-client -S 2>/dev/null || true
 			return 0
 			;;
 		next-session)
@@ -241,10 +281,9 @@ input_main() {
 			target="${filtered[$new_idx]}"
 			# Delegate the live link/select to preview.sh (P1.M3; FINDING 9). It
 			# fires session-window-changed (suppressed by activate T4.S2) but
-			# NEVER client-session-changed (Invariant A). Guard a mid-nav failure
-			# (session gone) so nav still advances + redraws.
-			"$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true
-			tmux refresh-client -S 2>/dev/null || true
+			# NEVER client-session-changed (Invariant A). _lp_preview_follow redraws +
+			# (deferred | sync) preview; guard a mid-nav failure (session gone).
+			_lp_preview_follow "$target"
 			return 0
 			;;
 		prev-session)
@@ -262,8 +301,7 @@ input_main() {
 			new_idx=$(( (cur_index - 1 + L) % L ))
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
-			"$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true
-			tmux refresh-client -S 2>/dev/null || true
+			_lp_preview_follow "$target"
 			return 0
 			;;
 		# --- P1.M6.T3.S1 seam: confirm ---
@@ -398,10 +436,6 @@ input_main() {
 				# Sync the live preview to the new top filtered match (PRD §3 / README;
 				# mirror next/prev). Always index 0 — these branches just reset it.
 				_lp_sync_preview_to_top_match
-				# Force the #() renderer to re-run so the picker redraws with the
-				# empty query + the full list (PRD §10/§16). Guard the detached edge
-				# (mirror backspace / type / restore.sh STEP 6c).
-				tmux refresh-client -S 2>/dev/null || true
 				# LOAD-BEARING return: this is what keeps the picker OPEN. Omitting
 				# it would fall through to restore.sh cancel (the picker would tear
 				# down on the FIRST press — the exact bug the two-step semantics

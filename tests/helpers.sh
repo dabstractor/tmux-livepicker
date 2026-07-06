@@ -83,6 +83,16 @@ assert_contains() {
 # unique socket name (FINDING 5) so each test is hermetic.
 setup_test() {
 	setup_socket "${1:-}"
+	# PRD §18: the shipped default is @livepicker-preview-defer=on (background
+	# run-shell -b preview). That makes the existing functional/restore/etc. tests'
+	# SYNCHRONOUS @livepicker-linked-id assertions race the async job (they assert
+	# immediately after input-handler.sh type/next/backspace). Pin OFF here so the
+	# whole suite stays deterministic on the synchronous path it was written for;
+	# the deferred path is validated by tests/test_responsiveness.sh (P1.M3.T1.S1),
+	# which sets @livepicker-preview-defer back to ON. (Per-test: each test gets a
+	# fresh server; clear_all_state preserves §11 config so the pin holds for the
+	# picker lifetime within a test.)
+	tmux set-option -g @livepicker-preview-defer off 2>/dev/null || true
 }
 
 # teardown_test — kill the isolated server + clean tmp for the test just run. THIN

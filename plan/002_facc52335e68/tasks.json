@@ -93,7 +93,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "§18 Deferred preview (interaction-first responsiveness)",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Rework the input→preview data flow: the typing and nav paths stop calling preview.sh inline and instead schedule a background, supersedeable preview; preview.sh gains a sequence guard so a late job whose target was superseded is a no-op. Default-on; @livepicker-preview-defer off restores the synchronous path (current behavior) for diagnosis.",
           "tasks": [
             {
@@ -148,14 +148,14 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "input-handler.sh: defer preview on type/backspace/nav when preview-defer is on",
-              "status": "Researching",
+              "status": "Complete",
               "description": "When opt_preview_defer == on (default): replace the inline _lp_sync_preview_to_top_match call in type/backspace/cancel-clear and the inline preview.sh call in next-session/prev-session with a deferred schedule (increment seq, set target, run-shell -b). The synchronous work on these paths becomes ONLY: update filter/index state + refresh-client -S. When opt_preview_defer == off, call preview.sh inline as today (legacy path). Confirm branch is unchanged (already reads authoritative state).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T3.S1",
                   "title": "Centralize deferred-preview fire helper and rewire type/backspace/nav/cancel-clear call sites",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",
@@ -183,14 +183,14 @@
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "tests/test_responsiveness.sh — §15.23 deferred-preview validation",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Assert the §18 responsiveness contract: typing redraws status before any preview work runs; three keystrokes + immediate Enter lands correctly with no preview backlog; a superseded preview is a no-op; navigation moves the highlight before the preview catches up; preview-defer off restores synchronous preview.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Write test_responsiveness.sh under the socket-isolated harness",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T3.S1"
