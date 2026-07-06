@@ -42,3 +42,4 @@ opt_highlight_fg()         { get_opt "@livepicker-highlight-fg" "black"; }    # 
 opt_highlight_bg()         { get_opt "@livepicker-highlight-bg" "yellow"; }   # tmux color
 opt_show_count()           { get_opt "@livepicker-show-count" "on"; }         # bool on/off
 opt_status_format_index()  { get_opt "@livepicker-status-format-index" "0"; } # int 0-9
+opt_tab_style()            { get_opt "@livepicker-tab-style" "plain"; }       # enum: plain|window-status (PRD §17; plain=standalone fg/bg, window-status=reuse theme window-status-format)
