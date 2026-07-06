@@ -73,14 +73,29 @@ preview_fallback() {
 
 # argv[1] = candidate session name S.
 preview_main() {
-	local S="${1:-}"
-	local current_session orig_window linked_id src_id w_sess w_idx
+	local S="${1:-}" expected_seq="${2:-}"
+	local current_session orig_window linked_id src_id w_sess w_idx cur_seq
 
 	# The session we preview INSIDE (the driver). Equal to the live client session
 	# during browsing (Invariant A); client-independent (FINDING 9).
 	current_session="$(get_state "$ORIG_SESSION" "")"
 	orig_window="$(get_state "$ORIG_WINDOW" "")"
 	linked_id="$(get_state "$STATE_LINKED_ID" "")"
+
+	# --- deferred-preview supersede guard (PRD §18 / external_tmux_behavior.md Q6) ---
+	# When called WITH an expected_seq ($2 — the deferred background path from
+	# P1.M2.T3's fire helper), bail EARLY if the live seq has advanced past it: a
+	# newer keystroke fired a newer preview, so THIS job is stale and must NOT touch
+	# any window. (A run-shell -b job is non-cancellable — Q5 — so it no-ops here.)
+	# When called with ONE arg ($2 empty — the activation first-preview and the
+	# preview-defer=off synchronous path), the guard is SKIPPED: behavior is exactly
+	# as before. clear_all_state unsets STATE_PREVIEW_SEQ on exit (P1.M2.T1.S1 lists
+	# it in _STATE_RUNTIME_KEYS), so a late post-teardown job reads the "0" default
+	# != its captured seq -> no-op too (the Q6 teardown-safety guarantee).
+	if [ -n "$expected_seq" ]; then
+		cur_seq="$(get_state "$STATE_PREVIEW_SEQ" "0")"
+		[ "$cur_seq" != "$expected_seq" ] && return 0
+	fi
 
 	# --- @livepicker-preview-mode gate (PRD §7 Fallbacks / §11; default live) ---
 	local mode
@@ -142,6 +157,20 @@ preview_main() {
 		return 0
 	fi
 
+	# Optional second supersede re-check (PRD §18 / Q6 read->mutate race). Placed
+	# here — BEFORE the first mutation (the unlink) — so a job that went stale
+	# between the top-of-function guard and now is a TRUE no-op (it skips
+	# unlink+link+select+set_state entirely, so no link is left untracked). Do NOT
+	# move this to before the final select-window: that fires AFTER link-window but
+	# BEFORE set_state LINKED_ID -> a stale job would link its window then bail,
+	# leaving an UNTRACKED link (a leak). (research FINDING 5.)
+	if [ -n "$expected_seq" ]; then
+		[ "$(get_state "$STATE_PREVIEW_SEQ" "0")" != "$expected_seq" ] && return 0
+	fi
+	# Re-read LINKED_ID here (not just the snapshot at the top) so the unlink targets
+	# the window ACTUALLY linked in the driver now (the freshest) — a newer -b job may
+	# have linked a different window and updated @livepicker-linked-id since entry.
+	linked_id="$(get_state "$STATE_LINKED_ID" "")"
 	# Drop the previous preview from the current session (NO -k; source keeps it).
 	# Ignore non-zero: singly-linked edge / already-gone (FINDING 2).
 	if [ -n "$linked_id" ]; then

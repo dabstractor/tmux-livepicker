@@ -93,7 +93,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "§18 Deferred preview (interaction-first responsiveness)",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Rework the input→preview data flow: the typing and nav paths stop calling preview.sh inline and instead schedule a background, supersedeable preview; preview.sh gains a sequence guard so a late job whose target was superseded is a no-op. Default-on; @livepicker-preview-defer off restores the synchronous path (current behavior) for diagnosis.",
           "tasks": [
             {
@@ -123,14 +123,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "preview.sh: supersede/sequence guard + background-safe entry",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Add an optional second arg preview.sh <session> <expected_seq>. When provided, read the live @livepicker-preview-seq at the top of preview_main and if it differs, return 0 without unlinking/linking/selecting (a stale job must never clobber the current link). When called with one arg (activation first-preview and preview-defer off synchronous path), behave exactly as today. Also re-read linked-id inside the body so a job that raced a newer link does not unlink the newer window.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Add expected_seq arg and supersede guard to preview_main",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S1"
@@ -148,14 +148,14 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "input-handler.sh: defer preview on type/backspace/nav when preview-defer is on",
-              "status": "Planned",
+              "status": "Researching",
               "description": "When opt_preview_defer == on (default): replace the inline _lp_sync_preview_to_top_match call in type/backspace/cancel-clear and the inline preview.sh call in next-session/prev-session with a deferred schedule (increment seq, set target, run-shell -b). The synchronous work on these paths becomes ONLY: update filter/index state + refresh-client -S. When opt_preview_defer == off, call preview.sh inline as today (legacy path). Confirm branch is unchanged (already reads authoritative state).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T3.S1",
                   "title": "Centralize deferred-preview fire helper and rewire type/backspace/nav/cancel-clear call sites",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",
