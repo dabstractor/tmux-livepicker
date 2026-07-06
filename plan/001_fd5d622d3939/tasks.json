@@ -622,14 +622,14 @@
               "type": "Task",
               "id": "P1.M7.T1",
               "title": "Test harness: socket-isolation shim",
-              "status": "Ready",
+              "status": "Complete",
               "description": "A PATH-wrapper that redirects bare `tmux` calls to an isolated `tmux -L <socket>` server, so plugin scripts (which call bare `tmux`) operate on a throwaway server.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T1.S1",
                   "title": "tests/setup_socket.sh — PATH-wrapper tmux shim",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE (CRITICAL — system_context.md §7): NO sibling plugin has a socket-isolation harness. PRD §15's 'as in the session-history test' references a pattern that does NOT exist there. resurrect uses Vagrant+expect with a real kill-server (too heavy, not isolated). This subtask INVENTS the shim. Plugin scripts call bare `tmux`; a PATH shim lets those calls hit an isolated `tmux -L` socket without code changes.\n2. INPUT: none.\n3. LOGIC: Create a temp dir, write an executable `tmux` wrapper: `#!/usr/bin/env bash; exec /usr/bin/tmux -L \"$TEST_SOCKET\" \"$@\"` (hardcode the real tmux path, NOT recursive). chmod +x. export PATH=\"<tmpdir>:$PATH\". export TEST_SOCKET. Start an isolated server: the wrapper `tmux new-session -d -s driver`. Provide setup() and teardown() functions: setup creates the shim+server+spawns a few test sessions/windows/panes; teardown runs `tmux kill-server` (hits the isolated socket via PATH) and `rm -rf` the temp dir. Confirm the real user server is untouched by checking its socket differs.\n4. OUTPUT: tests/setup_socket.sh providing setup_socket/teardown_socket; every subsequent test sources it and gets an isolated `tmux`.\n5. MOCKING: This IS the mocking infra. Self-test: run setup, assert `tmux list-sessions` shows only the test sessions, assert the real server (via /usr/bin/tmux directly) is unchanged, run teardown, assert the socket is gone.\n6. DOCS: Mode A — none (test infra).",
@@ -644,14 +644,14 @@
               "type": "Task",
               "id": "P1.M7.T2",
               "title": "Test harness: helpers + runner",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Resurrect-style fail/teardown helpers and a runner that discovers and executes all test_* functions across test_*.sh files.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M7.T2.S1",
                   "title": "tests/helpers.sh + tests/run.sh",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M7.T1.S1"
