@@ -178,8 +178,7 @@ Run from the repo root. The suite spins up a **private, isolated tmux socket per
 test** via a `tmux` PATH-wrapper shim, so your real running server is never
 touched. It prints `PASS` / `FAIL` per test plus a summary and exits `0` iff all
 passed. Expect the full suite to take roughly **2–3 minutes** (each test starts
-a fresh isolated tmux server and sources the user config); a `VALIDATE_SKIP_SLOW=1`
-budget is available in `./validate.sh` for faster static + E2E checks. The suites cover the PRD §15 clusters:
+a fresh isolated tmux server and sources the user config). The suites cover the PRD §15 clusters:
 
 - **Functional** — activation, filtering, navigation, confirm, cancel.
 - **Live preview** — the all-panes in-place preview.

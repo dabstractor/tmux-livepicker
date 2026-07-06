@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Adversarial QA Bugfix Pass",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Remediate the 5 issues discovered during the end-to-end adversarial QA validation pass against the original PRD (1 Critical, 1 Major, 3 Minor). Each fix is localized to 1-2 script files with a TDD regression test that FAILS today and PASSES after the fix. The shipped tests/run.sh suite (24/24 passing) continues to pass throughout. No architectural changes are required — all fixes operate within the existing data-flow of activate -> input -> render -> preview -> restore.",
       "milestones": [
         {
@@ -71,7 +71,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Minor Robustness Fixes",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Fix the three minor issues: (3) renderer # injection into tmux format strings, (4) window-mode preview showing the active window instead of the highlighted one, and (5) README referencing a non-existent ./validate.sh. These are robustness/UX/docs improvements that do not cause data loss but degrade the picker experience or mislead users.",
           "tasks": [
             {
@@ -127,14 +127,14 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "Fix README reference to non-existent ./validate.sh (Issue 5)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Remove the README sentence that advertises a VALIDATE_SKIP_SLOW=1 budget in ./validate.sh, which does not exist. The real and only test entry point is 'bash tests/run.sh' (already documented on the preceding line).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T3.S1",
                   "title": "Remove the non-existent validate.sh reference from README Validation section",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See plan/001_fd5d622d3939/bugfix/001_15442f34c366/architecture/bugfix_findings.md §ISSUE 5. README.md line 182 (inside the ## Validation section, which starts at line 172) contains the sentence: 'a `VALIDATE_SKIP_SLOW=1` budget is available in `./validate.sh` for faster static + E2E checks.' Confirmed: NO validate.sh exists anywhere in the repo (find . -name 'validate.sh' returns empty). tests/run.sh has no VALIDATE_SKIP_SLOW handling. Users following the README get 'No such file or directory.' The real entry point 'bash tests/run.sh' is already documented on README.md line 174. Neither validate.sh nor VALIDATE_SKIP_SLOW is referenced anywhere else in the codebase.\n2. INPUT: README.md current content at the Validation section (lines 172-189). No code changes needed.\n3. LOGIC: In README.md, remove the trailing clause on line 182 from 'a `VALIDATE_SKIP_SLOW=1` budget is available in `./validate.sh` for faster static + E2E checks. ' so that the paragraph reads: '...each test starts a fresh isolated tmux server and sources the user config). The suites cover the PRD §15 clusters:'. Do NOT remove or change the 'bash tests/run.sh' command (line 174) — it is correct. Do NOT add a validate.sh wrapper (the PRD's suggested fix offers two options; the doc-removal is in-scope per the bugfix SOW; shipping a new wrapper is a feature addition outside this pass).\n4. OUTPUT: README.md Validation section no longer references validate.sh or VALIDATE_SKIP_SLOW.\n5. MOCKING: N/A — documentation-only change.\n6. DOCS: [Mode A] This subtask IS the README documentation fix. The change removes a broken reference from README.md §Validation. No other doc files reference validate.sh.",
@@ -153,21 +153,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Sync changeset-level documentation",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Final cross-cutting documentation sweep covering the whole changeset: update the CHANGELOG with entries for all 5 bugfixes and verify README consistency (the preview-follows-type fix now makes the README's 'The preview follows live' promise true; the validate.sh fix is already handled by P1.M2.T3.S1). This task runs LAST and depends on every implementing subtask.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Sync changeset-level documentation (CHANGELOG + README overview)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Update CHANGELOG.md with entries for all 5 bugfixes from this adversarial QA pass, and verify README.md is consistent with the implemented behavior (preview now follows type, validate.sh reference removed).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Update CHANGELOG with all 5 bugfix entries",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
