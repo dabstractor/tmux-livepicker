@@ -206,3 +206,75 @@ test_window_confirm_lands_on_chosen_window() {
 		*) fail "window-mode confirm did not land on an alpha window (got window: $(tmux display-message -p '#{window_name}'))" ;;
 	esac
 }
+
+# test_preview_follows_type_filter — Bugfix Issue 2: typing a filter must sync the
+# live preview to the TOP filtered match (PRD §3 story 3 + README "the preview
+# follows live"). Before the fix, type set filter+index+refresh but never called
+# preview.sh -> the preview stayed frozen on the self-session (linked-id "") while
+# the highlight moved. Mirror test_typing_filters (syslog+blog before activate) +
+# test_nav_moves_selection (assert linked-id == dynamic window id).
+test_preview_follows_type_filter() {
+	attach_test_client
+	# 'log'-matching fixtures BEFORE activate (the list is captured at activate time).
+	tmux new-session -d -s syslog -x 120 -y 40
+	tmux new-session -d -s blog   -x 120 -y 40
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"
+	# Activate's first preview is the SELF-session (driver) -> no link yet.
+	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "" \
+		"initial self-session preview leaves no link"
+	# Type "blog" -> uniquely matches blog (no other session contains "blog").
+	# Window ids are GLOBAL -> read blog's active id DYNAMICALLY.
+	local blog_wid
+	blog_wid="$(tmux list-windows -t =blog -F '#{window_id}' -f '#{window_active}')"
+	local c
+	for c in b l o g; do
+		"$LIVEPICKER_SCRIPTS/input-handler.sh" type "$c" >/dev/null
+	done
+	# PRD §3: the preview follows the top match. Before the fix this stayed "" (FAIL).
+	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "$blog_wid" \
+		"type filter synced the preview to the top match (blog)"
+}
+
+# test_preview_follows_backspace — Bugfix Issue 2 (backspace half): backspacing to
+# clear the query must re-sync the preview to the top of the FULL list. Before the
+# fix, backspace left the preview frozen on the last-typed match. The expected
+# linked-id is computed DYNAMICALLY from @livepicker-list's first line (empty if it
+# is the driver/self — the self-session path clears linked_id; else that session's
+# active window id). blog (created last) is never the list's top -> the bug
+# (linked-id frozen on blog) deterministically FAILS this assertion.
+test_preview_follows_backspace() {
+	attach_test_client
+	tmux new-session -d -s syslog -x 120 -y 40
+	tmux new-session -d -s blog   -x 120 -y 40
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"
+	# Type "blog" -> preview synced to blog (proven by test_preview_follows_type_filter;
+	# re-assert here as the starting point for the backspace sequence).
+	local blog_wid c
+	blog_wid="$(tmux list-windows -t =blog -F '#{window_id}' -f '#{window_active}')"
+	for c in b l o g; do
+		"$LIVEPICKER_SCRIPTS/input-handler.sh" type "$c" >/dev/null
+	done
+	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "$blog_wid" \
+		"starting point: type synced the preview to blog"
+	# Backspace 4x -> filter cleared -> full list; index reset to 0.
+	local i
+	for i in 1 2 3 4; do
+		"$LIVEPICKER_SCRIPTS/input-handler.sh" backspace >/dev/null
+	done
+	assert_eq "$(tmux show-option -gqv @livepicker-filter)" "" \
+		"backspace cleared the filter"
+	# The top match is now the FIRST session in the full list. Compute its expected
+	# linked-id dynamically: "" if it is the driver (self-session clears linked_id),
+	# else that session's active window id.
+	local first_sess expected
+	first_sess="$(printf '%s\n' "$(tmux show-option -gqv @livepicker-list)" | sed -n '1p')"
+	if [ "$first_sess" = "$TEST_DRIVER_SESSION" ]; then
+		expected=""
+	else
+		expected="$(tmux list-windows -t "=$first_sess" -F '#{window_id}' -f '#{window_active}')"
+	fi
+	# PRD §3: backspace re-syncs the preview. Before the fix linked-id stayed blog_wid
+	# (FAIL, because blog is never the top of the full list).
+	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "$expected" \
+		"backspace-to-clear re-synced the preview to the top of the full list"
+}

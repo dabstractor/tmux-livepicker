@@ -117,6 +117,26 @@ _confirm_land_on_session() {
 	"$CURRENT_DIR/restore.sh" keep
 }
 
+# _lp_sync_preview_to_top_match — re-link the live preview to the TOP filtered
+# match (index 0), so the preview pane tracks the status-line highlight when the
+# user types / backspaces / clears the query (PRD §3 story 3 + README "the preview
+# follows live"). Reconciles PRD §5 (which lists type/backspace as status-only) in
+# favour of §3 / the README. Mirrors the nav (next/prev) resolution: same
+# lp_build_filtered the renderer uses (so filtered[0] == the highlighted session),
+# same preview.sh call + `2>/dev/null || true` guard. type/backspace/cancel-clear
+# always reset @livepicker-index to 0, so the top match is ALWAYS filtered[0].
+# Empty filtered list (no matches) -> skip the preview (leave the prior pane as-is,
+# mirroring nav's `[ "$L" -eq 0 ] && return 0` guard).
+_lp_sync_preview_to_top_match() {
+	local _list _filt
+	local -a _sync_filtered=()
+	_list="$(get_state "$STATE_LIST" "")"
+	_filt="$(get_state "$STATE_FILTER" "")"
+	mapfile -t _sync_filtered < <(lp_build_filtered "$_list" "$_filt")
+	[ "${#_sync_filtered[@]}" -eq 0 ] && return 0
+	"$CURRENT_DIR/preview.sh" "${_sync_filtered[0]}" 2>/dev/null || true
+}
+
 # argv[1] = action; argv[2] = the typed char (for `type`). Dispatch + act.
 input_main() {
 	local action char new_filter cur_filter cur_list cur_index L new_idx target pick_type query orig_session linked_id
@@ -143,8 +163,13 @@ input_main() {
 			new_filter="$(get_state "$STATE_FILTER" "")$char"
 			set_state "$STATE_FILTER" "$new_filter"
 			# Reset the highlight to the top filtered match (PRD §6). Always safe
-			# — the renderer clamps + handles FLEN=0 itself (FINDING 4).
+			# — the renderer clamps + handles FLEN=0 itself (FINDING 4). The preview
+			# now ALSO follows the top match (PRD §3 story 3 / README "the preview
+			# follows live") via _lp_sync_preview_to_top_match, mirroring nav.
 			set_state "$STATE_INDEX" "0"
+			# Sync the live preview to the new top filtered match (PRD §3 / README;
+			# mirror next/prev). Always index 0 — these branches just reset it.
+			_lp_sync_preview_to_top_match
 			# Force the #() renderer to re-run (PRD §10/§16). Requires a client
 			# (production always has one); guard the detached edge (FINDING 3).
 			tmux refresh-client -S 2>/dev/null || true
@@ -163,10 +188,12 @@ input_main() {
 			# each change, run tmux refresh-client -S ..." The renderer does the
 			# filtering + highlighting — the handler only trims filter/index +
 			# refresh (research FINDING 2/4).
-			# CONTRACT (work-item §3): backspace = filter+index+refresh ONLY.
-			# It does NOT call preview.sh (FINDING 4) — the top match is already
-			# shown; shortening the filter may re-admit a different top match
-			# (a known minor UX gap that re-syncs on the next nav/confirm).
+			# CONTRACT (work-item §3): backspace trims the query and re-syncs the
+			# preview to the (possibly new) top filtered match (PRD §3 story 3 +
+			# README "the preview follows live"; reconciles PRD §5 in favour of §3).
+			# Shortening the filter may re-admit a different top match ->
+			# _lp_sync_preview_to_top_match re-links it so the preview pane stays
+			# aligned with the highlight.
 			cur_filter="$(get_state "$STATE_FILTER" "")"
 			# ${var%?} removes the shortest trailing match of one char. On an
 			# empty var it yields "" (no error, no set -u issue). Guard empty
@@ -178,6 +205,9 @@ input_main() {
 			# Reset the highlight to the top filtered match (PRD §6). Always
 			# safe — the renderer clamps + handles FLEN=0 itself.
 			set_state "$STATE_INDEX" "0"
+			# Sync the live preview to the new top filtered match (PRD §3 / README;
+			# mirror next/prev). Always index 0 — these branches just reset it.
+			_lp_sync_preview_to_top_match
 			# Force the #() renderer to re-run (PRD §10/§16). Guard the detached
 			# edge (FINDING 3; mirror the `type` branch / restore.sh STEP 6c).
 			tmux refresh-client -S 2>/dev/null || true
@@ -341,8 +371,10 @@ input_main() {
 				# First press with a NON-empty filter: CLEAR the query (like
 				# backspace-to-empty) and KEEP THE PICKER OPEN. This is the
 				# load-bearing UX detail (work-item §1). Mirror backspace (T2.S1)
-				# exactly: set filter, set index=0, refresh — but write "" (the
-				# WHOLE query) instead of ${cur_filter%?} (one char).
+				# exactly: set filter, set index=0, sync the preview, refresh — but
+				# write "" (the WHOLE query) instead of ${cur_filter%?} (one char).
+				# The preview re-syncs to the now-unfiltered top match (PRD §3 /
+				# README; mirrors backspace).
 				# FINDING 1: set_state "" is a SET-EMPTY (tmux set-option -g @x ""),
 				# NOT an unset; get_state reads it back as "" (the default). Do NOT
 				# use tmux_unset_opt / -gu (that is restore's teardown concern).
@@ -351,6 +383,9 @@ input_main() {
 				# safe — the renderer clamps + handles FLEN=0 (empty filter matches
 				# ALL names; renderer FINDING 4 / filter.sh).
 				set_state "$STATE_INDEX" "0"
+				# Sync the live preview to the new top filtered match (PRD §3 / README;
+				# mirror next/prev). Always index 0 — these branches just reset it.
+				_lp_sync_preview_to_top_match
 				# Force the #() renderer to re-run so the picker redraws with the
 				# empty query + the full list (PRD §10/§16). Guard the detached edge
 				# (mirror backspace / type / restore.sh STEP 6c).
