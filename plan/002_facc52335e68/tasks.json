@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Theme-matched tabs (§17) & deferred preview (§18)",
-      "status": "Planned",
+      "status": "Ready",
       "description": "Deliver the two new capabilities added by PRD revision 002 as independent tracks against the already-shipped plan-001 implementation (16 tests green). Track A (§17): the picker can render its items through the theme's own window-status-current-format / window-status-format so it looks like the user's window tabs under any theme, gated by @livepicker-tab-style (plain default). Track B (§18): typing and navigation redraw the status synchronously but defer the live preview to a background, supersedeable run-shell -b job so a keystroke never waits on link-window/select-window, gated by @livepicker-preview-defer (on default). Neither feature fires client-session-changed or touches the saved-state contract; both tear down via clear_all_state. Build target: tmux 3.6b (floor 3.0).",
       "milestones": [
         {
@@ -176,21 +176,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Validation (§15.23 + §15.24) + changeset-level documentation",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Feature-specific tests under the existing socket-isolated harness, mirroring the new §15 subsections, then the cross-cutting Mode-B documentation sync (README config table + notes, CHANGELOG entry).",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "tests/test_responsiveness.sh — §15.23 deferred-preview validation",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Assert the §18 responsiveness contract: typing redraws status before any preview work runs; three keystrokes + immediate Enter lands correctly with no preview backlog; a superseded preview is a no-op; navigation moves the highlight before the preview catches up; preview-defer off restores synchronous preview.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Write test_responsiveness.sh under the socket-isolated harness",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T3.S1"
@@ -207,14 +207,14 @@
               "type": "Task",
               "id": "P1.M3.T2",
               "title": "tests/test_appearance.sh — §15.24 window-status tab validation",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Install representative window-status-format/window-status-current-format/window-status-separator fixtures on the isolated socket (tubular is not loaded there), activate with @livepicker-tab-style window-status, and assert the highlighted item matches the current-format styling and others the inactive-format; assert the inter-item gap matches the separator; assert empty/unresolvable format falls back to plain; assert tab-style plain (default) is unchanged.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
                   "title": "Write test_appearance.sh under the socket-isolated harness",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T3.S1"
@@ -231,14 +231,14 @@
               "type": "Task",
               "id": "P1.M3.T3",
               "title": "Sync changeset-level documentation (README.md + CHANGELOG.md)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Mode-B catch-all: update README.md (add the two new options to the configuration table; add short Appearance and Performance notes) and CHANGELOG.md (an entry for both features noting defaults and that they do not change the pollution/restore invariants). Do NOT edit PRD.md (read-only).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T3.S1",
                   "title": "Update README.md config table + notes and CHANGELOG.md entry for both features",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1",
