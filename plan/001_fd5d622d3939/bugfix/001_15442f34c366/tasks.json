@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Adversarial QA Bugfix Pass",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Remediate the 5 issues discovered during the end-to-end adversarial QA validation pass against the original PRD (1 Critical, 1 Major, 3 Minor). Each fix is localized to 1-2 script files with a TDD regression test that FAILS today and PASSES after the fix. The shipped tests/run.sh suite (24/24 passing) continues to pass throughout. No architectural changes are required — all fixes operate within the existing data-flow of activate -> input -> render -> preview -> restore.",
       "milestones": [
         {
@@ -153,21 +153,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Sync changeset-level documentation",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Final cross-cutting documentation sweep covering the whole changeset: update the CHANGELOG with entries for all 5 bugfixes and verify README consistency (the preview-follows-type fix now makes the README's 'The preview follows live' promise true; the validate.sh fix is already handled by P1.M2.T3.S1). This task runs LAST and depends on every implementing subtask.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Sync changeset-level documentation (CHANGELOG + README overview)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Update CHANGELOG.md with entries for all 5 bugfixes from this adversarial QA pass, and verify README.md is consistent with the implemented behavior (preview now follows type, validate.sh reference removed).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Update CHANGELOG with all 5 bugfix entries",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
