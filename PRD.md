@@ -38,8 +38,14 @@ keeps the user oriented, and never corrupts session history or the toggle.
 
 - Status-line picker: sessions replace windows on line 1, the user's window
   status moves to line 2.
+- Look like the user's own window tabs, not a foreign overlay: reuse the theme's
+  window-status appearance (colors, shape, separators, alignment) so the picker
+  reads as part of the status bar under any theme (section 17).
 - Live, in-place preview of the highlighted session, showing all panes of its
   active window at once, updating in real time.
+- Interaction feedback first: the status line redraws and the highlight moves
+  the instant a key is pressed; the live preview is deferred (it is inherently
+  slow) and must never block typing, navigation, or confirm (section 18).
 - Filter by typing; move through the list with the user's own window-nav keys.
 - Reserve every plain letter and digit for the query: navigation, confirm,
   cancel, and backspace use only non-alphanumeric keys, so typing can use the
@@ -72,6 +78,13 @@ keeps the user oriented, and never corrupts session history or the toggle.
 - I type `newproj`, see no matches, press Enter. A session named `newproj` is
   created and I am in it. With zoxide mode on, it opens in the directory zoxide
   resolves for `newproj`.
+- The picker tabs look identical to my window tabs — same colors, shape, and
+  separators — because the picker reuses my theme's own window-status styling
+  (section 17).
+- I hit the keybind and type three letters and press Enter, all in about 100ms.
+  I land in the session without ever perceiving lag or jank — and without ever
+  seeing a preview. The status line kept up with every keystroke and Enter did
+  not wait on a preview (section 18).
 - I press Escape. The picker closes, my status bar is one line again, and I am
   exactly where I was. My window-nav keys move windows again.
 
@@ -163,6 +176,10 @@ top match. Backspace removes the last character. After each change, run
 redraws. The renderer filters `@livepicker-list` by the query (substring,
 case-insensitive) and highlights the item at `@livepicker-index`.
 
+The status redraw is the only synchronous work on the typing path. The live
+preview is re-synced in the background, never inline, so a keystroke never waits
+on `link-window`/`select-window` (section 18).
+
 The typeable set is the full `a`-`z`, `A`-`Z`, `0`-`9` plus `-_. /`. Because the
 key table is modal (section 8), a key bound to a non-typing action is
 intercepted and cannot be typed; navigation, confirm, cancel, and backspace keys
@@ -172,8 +189,9 @@ are therefore constrained to non-alphanumeric keys (arrows,
 ### Session navigation
 
 `next-session` and `prev-session` move `@livepicker-index` within the filtered
-list (wrapping). Each move refreshes the preview (section 7) and the status
-renderer. Navigation must not call `switch-client`.
+list (wrapping). Each move redraws the status immediately; the preview re-sync
+is deferred to the background so the highlight tracks the keypress with no lag
+(section 18). Navigation must not call `switch-client`.
 
 ### Confirm
 
@@ -209,6 +227,10 @@ not a navigation) `switch-client` back to the original session. Clear all
 This is the defining feature. It must show the candidate session's active window
 with all of its panes, live, in the area below the status bar, without switching
 sessions.
+
+This section describes *how* a preview is produced. Section 18 specifies *when*:
+previews are deferred relative to input, so they never block typing or
+navigation.
 
 ### Mechanism: link-window plus select-window
 
@@ -415,7 +437,9 @@ All options use the `@livepicker-` prefix.
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                        |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                        |
 | `@livepicker-preview-mode`         | `live`     | `live` (link-window, all panes), `snapshot` (capture-pane, active pane), or `off`.                       |
+| `@livepicker-preview-defer`        | `on`       | Defer the live preview to the background so it never blocks typing/nav/confirm (section 18); `off` restores the synchronous path. |
 | `@livepicker-suppress-window-hook` | `on`       | Clear `session-window-changed` during the picker to avoid focus-resync side effects.                     |
+| `@livepicker-tab-style`            | `plain`    | `plain` (standalone fg/bg highlight) or `window-status` (reuse the theme's window-status-current-format/`window-status-format` so picker tabs match the user's window tabs; section 17). |
 | `@livepicker-fg`                   | `default`  | Picker text color.                                                                                       |
 | `@livepicker-bg`                   | `default`  | Picker background.                                                                                       |
 | `@livepicker-highlight-fg`         | `black`    | Highlighted (current) item text.                                                                         |
@@ -538,6 +562,26 @@ With `tmux-session-history` installed:
   fixture cannot reliably resolve. Verify manually against an established
   zoxide entry (create, assert `pane_start_path`, kill).
 
+### Responsiveness
+
+- The per-keystroke wall-clock on the typing path is dominated by the renderer,
+  not by `link-window`/`select-window`: assert that typing a character redraws
+  the status with the new query before any preview work runs.
+- Rapid input then confirm: three keystrokes within ~100 ms followed immediately
+  by Enter lands on the correct target, renders no preview, and queues no
+  backlog of preview re-links.
+- A preview whose target was superseded by a newer selection is a no-op: it does
+  not unlink/link a stale window and does not clobber the newer link.
+- Navigation moves the highlight visibly before the preview catches up.
+
+### Appearance (window-status hijack)
+
+- With `@livepicker-tab-style window-status`, the highlighted item matches the
+  user's `window-status-current-format` and the others match
+  `window-status-format` (same colors/shape); the inter-item gap matches
+  `window-status-separator`; the line honors `status-justify`.
+- If a format is empty or unresolvable, the renderer falls back to `plain`.
+
 ## 16. Implementation risks and notes
 
 - **link-window edge cases.** Linking can fail if the source is already linked
@@ -548,6 +592,15 @@ With `tmux-session-history` installed:
 - **Status renderer refresh.** The `#()` renderer only re-runs on status redraw.
   Every input action must call `refresh-client -S`. Verify the renderer updates
   within 100 ms of a keystroke.
+- **Deferred-preview concurrency.** A background preview must be superseded, not
+  queued: track a pending target/sequence and discard a late result so a stale
+  `unlink-window`/`link-window` never clobbers the current link. Confirm reads
+  authoritative filter/index state and must not depend on a preview having run.
+- **Window-status hijack fragility.** `#{…}` in a theme format is not re-expanded
+  in `#()` output — it must be pre-resolved (sentinel window + `display-message`,
+  section 17). Window-state specifiers (`#F`, pane/bell/prefix icons) resolve to
+  the sentinel's state, not the session's; verify they collapse to a clean tab.
+  Fall back to `plain` on any resolution failure.
 - **Key fallthrough.** Confirm whether unmatched keys in the `livepicker` table
   are dropped or passed to the previewed pane. If passed, bind common keys so no
   input leaks into the candidate session.
@@ -573,3 +626,127 @@ With `tmux-session-history` installed:
   to avoid conflicting with the user's live, running instance. When a final real
   -world test must be performed, it is critical to ensure that the user's
   initial state be returned upon completion.
+
+## 17. Tab appearance — reuse the window-status format
+
+**Requirement.** The picker must look like the user's own window tabs, not a
+foreign element drawn on top of the status bar. Rather than ship its own styling
+(which would either ignore the user's theme or special-case each one), the
+renderer reuses tmux's standard, themeable window-status appearance — the same
+system every tmux theme (tubular, catppuccin, gruvbox, plain) already
+configures.
+
+**The official tokens.** tmux exposes window-tab appearance through two layers:
+
+- **Formats** (the full tab template — structure, colors, icons, the works):
+  - `window-status-current-format` — the active window tab.
+  - `window-status-format` — inactive window tabs.
+- **Styles** (color/attribute only): `window-status-current-style`,
+  `window-status-style` (+ `-last`, `-activity`, `-bell`).
+
+The picker hooks the **format** layer. The style layer alone is insufficient:
+themes like tubular set both styles to the same bar color and put the entire
+visual distinction (the rounded pill) into the *format*. Reading only the styles
+would make the highlighted item indistinguishable from the rest under such
+themes. Reading the formats reproduces the exact tab — pill, caps, colors, icons
+— for any theme.
+
+**Mapping.** The highlighted picker item renders through
+`window-status-current-format`; every other item renders through
+`window-status-format`. The inter-item gap is `window-status-separator`. The
+whole line honors `status-justify` (`absolute-centre` → centred), so the picker
+sits where the rest of the status content does.
+
+**The `#{…}` wrinkle (load-bearing).** Theme formats contain `#{…}` expansions
+(e.g. tubular's `#{E:@tubular_pill_bg}`) and window-state specifiers (`#W` name,
+`#F` flags, `#{window_panes}`, bell/prefix icons). Two facts constrain the
+implementation:
+
+1. A `#()` status command's stdout is **not** re-parsed for `#{…}` — only
+   `#[…]` style directives are applied. The formats therefore cannot be emitted
+   verbatim from the renderer; their `#{…}` must be expanded first.
+2. The window-state specifiers are window-context, but picker items are sessions
+   — there is no window whose name is the session name to render against.
+
+**Resolution: the sentinel window.** At activation, spin up one short-lived
+hidden window whose name is a unique placeholder (e.g. `__lp_tab__`), resolve
+both formats against it with `tmux display-message -p -t <sentinel> "$format"`,
+and cache the two rendered templates. Resolution expands every `#{…}` to
+concrete `#[fg=#hex…]` styles and bakes the placeholder name into the styled
+output; window-state bits resolve to a clean single-pane, no-bell, non-prefix
+tab (which is exactly what a picker row should show). Kill the sentinel. The
+renderer then only swaps the placeholder → each session name and emits the
+cached templates; there is **no per-keystroke `display-message`**, so this stays
+fast (it composes with the §18 responsiveness contract).
+
+**Control.** `@livepicker-tab-style` selects the mode:
+
+- `plain` (default): standalone `@livepicker-fg`/`bg`/`highlight-*` coloring
+  (current behavior; no theme dependency).
+- `window-status`: the format hijack above.
+
+**Fallback.** If either format is empty, unresolvable, or the sentinel step
+fails, fall back to `plain` so the option never breaks a setup.
+
+## 18. Responsiveness — interaction-first, deferred preview
+
+**Requirement.** Input feedback is the top priority; the live preview is a
+nice-to-have that must never get in its way. Concretely: opening the picker,
+typing several characters rapidly, and confirming must all feel instantaneous —
+the status line tracks every keystroke as it happens, and confirm does not wait
+on a preview. The user may open, type three letters within ~100 ms, press Enter,
+and land in the new session **without ever seeing lag, jank, or even a preview**,
+because previewing is inherently slow and is therefore decoupled from the input
+path.
+
+**Root cause being addressed.** Today every keystroke runs synchronously: append
+to the filter, then `_lp_sync_preview_to_top_match` (an `unlink-window` +
+`link-window` + `select-window` round-trip), then `refresh-client -S`. The
+preview re-link is the expensive part and it blocks the status redraw, so each
+letter waits on the previous letter's preview. Navigation has the same shape.
+This is why fast typing and quick tab moves feel laggy.
+
+**The contract.**
+
+1. **Typing path is status-only and synchronous.** A typed/backspaced character
+   does exactly two things, synchronously: update `@livepicker-filter` (and
+   reset the index to the top match), then `refresh-client -S`. No
+   `link-window`, no `select-window`, no preview work on this path. The `#()`
+   renderer is cheap (option reads only), so the status reflects the new query
+   within a frame.
+2. **Navigation moves the highlight synchronously, defers the preview.**
+   `next-session`/`prev-session` update `@livepicker-index` and
+   `refresh-client -S` immediately; the preview re-sync is scheduled, not
+   inline.
+3. **The preview is deferred and supersedeable.** Preview work runs in the
+   background (`tmux run-shell -b`), not inline in the input handler. It is
+   **superseded, not queued**: if a new keystroke/selection arrives before the
+   pending preview runs, the pending one is cancelled (or its result discarded)
+   and the latest target wins. The preview always chases the current selection
+   and never accumulates a backlog. A short debounce may gate the background
+   fire so a burst of typing collapses to a single trailing preview.
+4. **Confirm does not block on the preview.** Resolving the target,
+   creating/switching, and tearing down proceed from the authoritative
+   filter/index state the moment Enter is pressed — independent of whether a
+   preview has rendered. The “type and Enter before any preview” path is a
+   first-class success case, not an edge case.
+
+**Mechanism notes.**
+
+- tmux has no threads; “background” means `run-shell -b` (a detached command)
+  plus a lightweight pending-token/sequence check so a late preview whose target
+  has been superseded is a no-op (it must not unlink/link a stale window, and
+  must not clobber a newer link).
+- The activation-time first preview may stay synchronous (activation is not
+  latency-sensitive).
+- Because the preview is no longer synchronous, the `session-window-changed`
+  suppression (section 7) still applies, but the *rate* of hook fires is
+  naturally bounded by debounce, easing that concern.
+
+**Control.** `@livepicker-preview-defer` (default `on`) toggles this behavior;
+`off` restores the legacy synchronous-preview path (useful for comparison or
+diagnosis).
+
+**Non-goal.** This is not about making the preview itself faster —
+`link-window`/`select-window` are irreducible server round-trips. It is about
+never making the user wait for them.
