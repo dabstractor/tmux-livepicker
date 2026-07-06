@@ -339,6 +339,18 @@ input_main() {
 			# Empty filtered list.
 			if [ "$pick_type" = "session" ] && [ "$(opt_create)" = "on" ]; then
 				query="$cur_filter"
+				# @livepicker-zoxide-mode on (mirrors sessionx's @sessionx-zoxide-mode):
+				# resolve the query through zoxide and start the session there
+				# (-c "$z_target"), naming the window after the dir (-n, like sessionx).
+				# zoxide only resolves dirs it has indexed with enough frecency; an
+				# empty result (not indexed / below threshold / zoxide absent) falls
+				# back to a PLAIN create (no -c) rather than -c "" — more robust than
+				# sessionx, and still satisfies the create gate below.
+				local z_target="" new_session_args=(-d -s "$query")
+				if [ "$(opt_zoxide)" = "on" ]; then
+					z_target="$(zoxide query "$query" 2>/dev/null)"
+					[ -n "$z_target" ] && new_session_args+=(-c "$z_target" -n "$z_target")
+				fi
 				# Robust create gate (FINDING 4/5). new-session SILENTLY SANITIZES
 				# names (':'->'_', leading '.'->'_') and returns rc=0 with a
 				# DIFFERENT name, so checking rc alone would strand the client
@@ -348,7 +360,7 @@ input_main() {
 				# an exact-$query session existed it would be a case-insensitive
 				# match -> in the filtered list -> this branch is never reached.
 				# Empty query -> new-session rc=1 -> gate false -> cancel.
-				if tmux new-session -d -s "$query" 2>/dev/null && tmux has-session -t "=$query" 2>/dev/null; then
+				if tmux new-session "${new_session_args[@]}" 2>/dev/null && tmux has-session -t "=$query" 2>/dev/null; then
 					_confirm_land_on_session "$query"
 				else
 					# Invalid/sanitized/empty name -> cancel (PRD §6 Confirm).

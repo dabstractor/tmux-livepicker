@@ -41,7 +41,11 @@ keeps the user oriented, and never corrupts session history or the toggle.
 - Live, in-place preview of the highlighted session, showing all panes of its
   active window at once, updating in real time.
 - Filter by typing; move through the list with the user's own window-nav keys.
-- Create a new session from the typed query when nothing matches.
+- Reserve every plain letter and digit for the query: navigation, confirm,
+  cancel, and backspace use only non-alphanumeric keys, so typing can use the
+  full `a`-`z`, `A`-`Z`, `0`-`9` range.
+- Create a new session from the typed query when nothing matches, optionally
+  opening it in the directory `zoxide` resolves for the query.
 - Zero pollution of session history and the session toggle while browsing.
 - Full, exact restoration of status layout, key table, and focus on exit.
 
@@ -66,7 +70,8 @@ keeps the user oriented, and never corrupts session history or the toggle.
   top match.
 - I press Enter on a match. The picker closes and I am in that session.
 - I type `newproj`, see no matches, press Enter. A session named `newproj` is
-  created and I am in it.
+  created and I am in it. With zoxide mode on, it opens in the directory zoxide
+  resolves for `newproj`.
 - I press Escape. The picker closes, my status bar is one line again, and I am
   exactly where I was. My window-nav keys move windows again.
 
@@ -158,6 +163,12 @@ top match. Backspace removes the last character. After each change, run
 redraws. The renderer filters `@livepicker-list` by the query (substring,
 case-insensitive) and highlights the item at `@livepicker-index`.
 
+The typeable set is the full `a`-`z`, `A`-`Z`, `0`-`9` plus `-_. /`. Because the
+key table is modal (section 8), a key bound to a non-typing action is
+intercepted and cannot be typed; navigation, confirm, cancel, and backspace keys
+are therefore constrained to non-alphanumeric keys (arrows,
+`C-M-Tab`/`C-M-BTab`, `Enter`, `Escape`, `BSpace`).
+
 ### Session navigation
 
 `next-session` and `prev-session` move `@livepicker-index` within the filtered
@@ -171,8 +182,15 @@ Resolve the target from the filtered list at the current index.
 - If a target exists: `switch-client -t "=target"`. One switch. This is the only
   session switch in the whole flow.
 - If the filtered list is empty, the type is `session`, and `@livepicker-create`
-  is on: create `tmux new-session -d -s "<query>"`, then `switch-client` to it.
-  If creation fails (invalid name), cancel instead.
+  is on: create a session from the query, then `switch-client` to it. If
+  creation fails (invalid name), cancel instead.
+  - Default: `tmux new-session -d -s "<query>"`.
+  - With `@livepicker-zoxide-mode` on (mirrors tmux-sessionx's
+    `@sessionx-zoxide-mode`): resolve the query through zoxide and start the
+    session there — `z_target=$(zoxide query "<query>")`;
+    `tmux new-session -d -s "<query>" -c "$z_target" -n "$z_target"`. If zoxide
+    returns nothing (dir unindexed, below its frecency threshold, or zoxide
+    absent), fall back to the default create above rather than `-c ""`.
 - If the type is `window`: `select-window -t "<session>:<window>"`. No new
   session creation in window mode.
 
@@ -290,19 +308,37 @@ of the box for this config:
 
 ### Binding
 
-On activate, bind in the `livepicker` table:
+On activate, bind in the `livepicker` table, in this order:
+
+1. A copy of the user's current prefix and root bindings (read
+   `tmux list-keys -T prefix` and `tmux list-keys -T root`, rewrite each line's
+   table to `livepicker`, and re-bind it) so the rest of their keybinds keep
+   working during the picker.
+2. Typing: every `a`-`z`, `A`-`Z`, `0`-`9`, and `-_. /` →
+   `input-handler.sh type <c>`.
+3. Confirm (`@livepicker-confirm-keys`, default `Enter`), cancel
+   (`@livepicker-cancel-keys`, default `Escape`), and backspace
+   (`@livepicker-backspace-keys`, default `BSpace`).
+4. Navigation: `@livepicker-next-key` + `@livepicker-nav-next-keys` (defaults
+   `C-M-Tab`, `Down`) → `next-session`; `@livepicker-prev-key` +
+   `@livepicker-nav-prev-keys` (defaults `C-M-BTab`, `Up`) → `prev-session`:
 
 ```
 tmux bind-key -T livepicker "$NEXT_KEY" run-shell "$SCRIPT_DIR/input-handler.sh next-session"
 tmux bind-key -T livepicker "$PREV_KEY" run-shell "$SCRIPT_DIR/input-handler.sh prev-session"
 ```
 
-Also bind supplemental navigation (`Down`/`j`, `Up`/`k`), typing (`a`-`z`,
-`A`-`Z`, `0`-`9`, and `-_. /`), confirm (`Enter`), cancel (`Escape`), and
-backspace (`BSpace`), plus a copy of the user's current prefix and root bindings
-so the rest of their keybinds keep working during the picker. Copy them by
-reading `tmux list-keys -T prefix` and `tmux list-keys -T root`, rewriting each
-line's table to `livepicker`, and re-binding it.
+Load-bearing ordering: tmux keeps the **last** binding for a key in a table, and
+step 4 runs after step 2. Any navigation/confirm/cancel/backspace key therefore
+**overrides** a typing binding for the same key — which is why those keys must
+be non-alphanumeric. An earlier default of `j`/`k` for next/prev left `j` and
+`k` silently untypeable: they were bound to `next-session`/`prev-session`, not
+`type j`/`type k`, so a query could never contain them. Reserving the full
+`a`-`z`, `A`-`Z`, `0`-`9` range for typing (navigating only with the arrows and
+the repurposed window-nav keys) removes that shadow. Vim-style `j`/`k`
+navigation is still available by setting `@livepicker-nav-next-keys`/
+`@livepicker-nav-prev-keys` to include `j`/`k`, accepting that those two letters
+are then not typeable.
 
 ### Discovery (optional convenience)
 
@@ -370,10 +406,11 @@ All options use the `@livepicker-` prefix.
 | `@livepicker-key`                  | (required) | Prefix key that activates the picker. If unset, the plugin prints a `display-message` and does not bind. |
 | `@livepicker-type`                 | `session`  | `session` or `window`. What the picker lists.                                                            |
 | `@livepicker-create`               | `on`       | In session mode, create a new session from the query on Enter when nothing matches.                      |
+| `@livepicker-zoxide-mode`          | `off`      | In session mode, when creating on Enter, resolve the query through `zoxide` and start the session there (mirrors `@sessionx-zoxide-mode`); falls back to a plain create if zoxide has no match. |
 | `@livepicker-next-key`             | `C-M-Tab`  | Key that moves to the next session. Defaults to this user's next-window key.                             |
 | `@livepicker-prev-key`             | `C-M-BTab` | Key that moves to the previous session. Defaults to this user's prev-window key.                         |
-| `@livepicker-nav-next-keys`        | `Down j`   | Extra next-session keys.                                                                                 |
-| `@livepicker-nav-prev-keys`        | `Up k`     | Extra previous-session keys.                                                                             |
+| `@livepicker-nav-next-keys`        | `Down`     | Extra next-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
+| `@livepicker-nav-prev-keys`        | `Up`       | Extra previous-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
 | `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                       |
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                        |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                        |
@@ -493,6 +530,13 @@ With `tmux-session-history` installed:
 - Session mode, no match, Enter: session created and active.
 - `@livepicker-create off`: nothing created.
 - Window mode: nothing created.
+- `@livepicker-zoxide-mode on` + no match + Enter (session mode): the new
+  session's starting directory (`#{pane_start_path}`) equals
+  `zoxide query "<query>"`. Not covered by the isolated socket suite: zoxide's
+  database is global, and a freshly indexed dir will not surface in a basename
+  query until it crosses zoxide's frecency threshold, so a hermetic in-suite
+  fixture cannot reliably resolve. Verify manually against an established
+  zoxide entry (create, assert `pane_start_path`, kill).
 
 ## 16. Implementation risks and notes
 
@@ -507,6 +551,17 @@ With `tmux-session-history` installed:
 - **Key fallthrough.** Confirm whether unmatched keys in the `livepicker` table
   are dropped or passed to the previewed pane. If passed, bind common keys so no
   input leaks into the candidate session.
+- **Navigation keys must be non-alphanumeric.** In the modal `livepicker` table
+  the navigation/confirm/cancel/backspace binds run after the typing binds, so a
+  key in any of those lists overrides its typing binding. A plain letter or
+  digit used for navigation is therefore silently untypeable. Keep those keys
+  non-alphanumeric (arrows, `C-M-Tab`/`C-M-BTab`, `Enter`, `Escape`, `BSpace`);
+  vim-style `j`/`k` is opt-in via `@livepicker-nav-*-keys`.
+- **zoxide dependency.** `@livepicker-zoxide-mode` shells out to `zoxide query`.
+  If `zoxide` is absent or returns no match, the create path falls back to a
+  plain `new-session` (never `-c ""`). zoxide resolves only dirs it has indexed
+  with sufficient frecency, so a one-off `zoxide add` of a temp dir will not
+  surface in a basename query.
 - **Hook suppression scope.** Clearing `session-window-changed` is global for the
   duration. Restore it exactly on exit, including the `-b` flag if present.
 - **Double activation.** Guard with `@livepicker-mode`. A second activation

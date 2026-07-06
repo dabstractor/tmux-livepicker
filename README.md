@@ -92,10 +92,11 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-key`                  | (required) | Prefix-table key that activates the picker. If unset, the plugin prints a `display-message` and binds nothing. |
 | `@livepicker-type`                 | `session`  | `session` or `window`. What the picker lists.                                                        |
 | `@livepicker-create`               | `on`       | In session mode, create a new session from the query on Enter when nothing matches.                  |
+| `@livepicker-zoxide-mode`          | `off`      | In session mode, resolve the create query through `zoxide` and start the session in that dir (mirrors `@sessionx-zoxide-mode`). |
 | `@livepicker-next-key`             | `C-M-Tab`  | Key that moves to the next session. Defaults to this user's next-window key.                         |
 | `@livepicker-prev-key`             | `C-M-BTab` | Key that moves to the previous session. Defaults to this user's prev-window key.                     |
-| `@livepicker-nav-next-keys`        | `Down j`   | Extra next-session keys.                                                                             |
-| `@livepicker-nav-prev-keys`        | `Up k`     | Extra previous-session keys.                                                                         |
+| `@livepicker-nav-next-keys`        | `Down`     | Extra next-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
+| `@livepicker-nav-prev-keys`        | `Up`       | Extra previous-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
 | `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                   |
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                    |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                    |
@@ -125,7 +126,10 @@ set -g @livepicker-highlight-bg 'magenta'
 2. **Filter** — type to filter the list (substring, case-insensitive); `BSpace`
    removes a character.
 3. **Navigate** — `C-M-Tab` / `C-M-BTab` (your window-nav keys, repurposed) or
-   `Down` / `j` and `Up` / `k` move the selection. The preview follows live.
+   `Down` / `Up` move the selection. The preview follows live. Plain letters
+   and digits are reserved for the query, so `j`/`k` (and every other letter)
+   are typeable by default; set `@livepicker-nav-next-keys`/`-prev-keys` to add
+   vim-style `j`/`k` nav at the cost of typing them.
 4. **Confirm** — `Enter` lands on the selection. In `session` mode with no match
    and `@livepicker-create on`, it creates a session from your query and switches
    to it.
