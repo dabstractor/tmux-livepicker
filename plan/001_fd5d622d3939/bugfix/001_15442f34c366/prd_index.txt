@@ -1,0 +1,13 @@
+h1.0 Bug Fix Requirements
+ h2.0 Overview
+ h2.1 Critical Issues (Must Fix)
+  h3.0 Issue 1: Duplicate restore.sh keep-window call in window-mode confirm destroys user status-format (and force-resets global options)
+ h2.2 Major Issues (Should Fix)
+  h3.1 Issue 2: Live preview does not follow the highlighted candidate when typing or backspacing
+ h2.3 Minor Issues (Nice to Fix)
+  h3.2 Issue 3: Renderer injects session names raw into tmux format strings (# causes mis-rendering)
+  h3.3 Issue 4: Window-mode preview shows the session's active window, not the specific highlighted window
+  h3.4 Issue 5: README references a non-existent ./validate.sh
+ h2.4 Testing Summary
+---
+code:4 para:42 list:3
