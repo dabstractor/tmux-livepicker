@@ -164,6 +164,17 @@ tmux-session-history timeline and the toggle pointer are untouched while you
 browse. The only session switch in the whole flow is the single `switch-client`
 at confirm. Cancelling leaves zero trace.
 
+### Known limitations
+
+- **Detached candidate windows are resized during preview.** When a detached
+  candidate window is linked into the attached driver session for live
+  preview, tmux resizes the shared window object to the driver's dimensions.
+  After the picker exits, the candidate's window retains the driver's size
+  rather than its original dimensions. This is inherent to tmux's
+  `window-size` behavior and affects only detached candidate sessions. To
+  avoid this, set `@livepicker-preview-mode snapshot` (uses `capture-pane`
+  and never links the window).
+
 ## Compatibility
 
 - Requires tmux **≥ 3.2** (multi-line `status` / `status-format[n]` is the

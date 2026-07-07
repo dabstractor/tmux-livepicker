@@ -140,7 +140,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Minor Issues: Race, Rendering, Limitations",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Fix the three Minor issues: the TOCTOU race in the deferred-preview supersede guard (Issue 4), the sentinel resolution gap for session-context format specifiers (Issue 5), and document the inherent detached-candidate resize side effect (Issue 6).",
           "tasks": [
             {
@@ -195,14 +195,14 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "Document detached candidate resize limitation (Issue 6)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Linking a detached candidate window into an attached driver resizes the shared window object to the driver's dimensions. On unlink, the candidate's size is NOT restored. Document this as a known limitation in README.md.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T3.S1",
                   "title": "Add Known Limitations section to README.md",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See issue4_5_6_findings.md §Issue 6. The README has NO 'Known Limitations' section. The 'How it works' section ends at ~line 164 (after 'Cancelling leaves zero trace.'). The next section is '## Compatibility' at ~line 166. tmux's window-size auto resizes a linked window to the largest attached client across ALL sessions.\n2. INPUT: README.md, the region between 'How it works' (ends ~line 164) and '## Compatibility' (~line 166).\n3. LOGIC: Insert a new subsection after 'How it works':\n   ```markdown\n   ### Known limitations\n\n   - **Detached candidate windows are resized during preview.** When a detached\n     candidate window is linked into the attached driver session for live\n     preview, tmux resizes the shared window object to the driver's dimensions.\n     After the picker exits, the candidate's window retains the driver's size\n     rather than its original dimensions. This is inherent to tmux's\n     `window-size` behavior and affects only detached candidate sessions. To\n     avoid this, set `@livepicker-preview-mode snapshot` (uses `capture-pane`\n     and never links the window).\n   ```\n   Place this between the end of 'How it works' and '## Compatibility'.\n4. OUTPUT: README.md has a 'Known Limitations' subsection documenting the detached-candidate resize behavior and the snapshot workaround.\n5. MOCKING: No external services. README.md is a static document.\n6. DOCS: [Mode A] This subtask IS the documentation change — it adds the Known Limitations content to README.md directly.",
@@ -234,7 +234,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Update CHANGELOG.md with bug fix entries",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
