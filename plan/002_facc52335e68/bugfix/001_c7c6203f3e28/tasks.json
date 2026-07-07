@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "QA Bug Fixes (rev 002 findings)",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Fix six issues found during end-to-end QA of the tmux-livepicker rev 002 implementation: 3 Major (index corruption, window-mode duplicate link, create-on-confirm orphan) and 3 Minor (TOCTOU race, sentinel resolution, detached resize). All fixes preserve the 'full, exact restoration' invariant (PRD §9/§15) and the supersede guarantee (PRD §18).",
       "milestones": [
         {
@@ -220,21 +220,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Sync changeset-level documentation",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Final documentation sweep: update CHANGELOG.md with all six bug fix entries and update README.md overview/feature sections that summarize the changeset. This task runs LAST and depends on every implementing subtask.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Sync changeset-level documentation",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Update CHANGELOG.md with entries for all six bug fixes. Verify README.md feature sections are consistent with the code changes (e.g., PRD §13 -a deviation, create path behavior).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Update CHANGELOG.md with bug fix entries",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
@@ -259,7 +259,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S2",
                   "title": "Verify and update README.md feature/behavior sections",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
