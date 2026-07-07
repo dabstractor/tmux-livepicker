@@ -44,3 +44,8 @@ opt_show_count()           { get_opt "@livepicker-show-count" "on"; }         # 
 opt_status_format_index()  { get_opt "@livepicker-status-format-index" "0"; } # int 0-9
 opt_tab_style()            { get_opt "@livepicker-tab-style" "plain"; }       # enum: plain|window-status (PRD §17; plain=standalone fg/bg, window-status=reuse theme window-status-format)
 opt_preview_defer()        { get_opt "@livepicker-preview-defer" "on"; }      # bool on|off (PRD §18; on=defer preview to bg run-shell -b supersedeable job, off=legacy synchronous)
+opt_nerd_fonts()             { get_opt "@livepicker-nerd-fonts" "on"; }             # bool on/off (opt-out for the search icon; tmux can't detect the font)
+opt_search_icon()            { get_opt "@livepicker-search-icon" $'\uf002'; }       # glyph: nf-fa-search U+F002 (ANSI-C quoting -> bytes ef 80 82; do NOT use "\uf002")
+opt_query_gap()              { get_opt "@livepicker-query-gap" "2"; }               # int: spaces between the query and the first session tab while a query is active (PRD §19)
+opt_overflow_left()          { get_opt "@livepicker-overflow-left" "<"; }           # left overflow indicator (presence-only; shown when @livepicker-scroll > 0)
+opt_overflow_right_format()  { get_opt "@livepicker-overflow-right-format" "+%d>"; } # right overflow indicator; %d = total hidden tabs, left+right combined (PRD §19)

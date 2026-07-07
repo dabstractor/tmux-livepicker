@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Foundation: rank.sh, layout.sh, options, state keys",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Add the two new sourced libs (rank.sh superseding filter.sh; layout.sh viewport math), the new options, and the new runtime state keys. No user-visible behavior change yet (the libs are unused until M2/M3); this lands the integration seams the later milestones plug into.",
           "tasks": [
             {
@@ -86,14 +86,14 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "New options + state keys (integration seams)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add the new @livepicker-* option accessors and runtime/saved-state keys as inert seams. Add: opt_nerd_fonts, opt_search_icon, opt_query_gap, opt_overflow_left, opt_overflow_right_format. Add STATE_SCROLL, STATE_CLIENT_WIDTH, ORIG_CLIENT_RESIZED_HOOK. Do NOT remove opt_show_count here (it stays referenced by renderer until M2.T3 removes its last consumer atomically).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Add P1 layout option accessors to options.sh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 0.5,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: options.sh uses the one-liner `opt_<name>() { get_opt \"@livepicker-<suffix>\" \"<default>\"; }` pattern (read scripts/options.sh for exact style). Defaults are PRD §11 verbatim.\n2. INPUT: The existing get_opt helper in options.sh.\n3. LOGIC: Add these accessors after opt_preview_defer, each a one-liner: opt_nerd_fonts() default \"on\"; opt_search_icon() default \"\\uf002\" (emit the raw UTF-8 byte sequence U+F002 — nf-fa-search; the literal in the source is the 3-byte UTF-8); opt_query_gap() default \"2\"; opt_overflow_left() default \"<\"; opt_overflow_right_format() default \"+%d>\". Do NOT remove opt_show_count (deferred to P1.M2.T3 where its last consumer is removed atomically).\n4. OUTPUT: options.sh defines the 5 new accessors; existing accessors untouched. Each returns the user-set value or the PRD default.\n5. DOCS: [Mode A] Add the 5 new rows to README.md's Configuration table (@livepicker-nerd-fonts, @livepicker-search-icon, @livepicker-query-gap, @livepicker-overflow-left, @livepicker-overflow-right-format) with their defaults. This rides WITH the work (per SOW §5 Mode A). Full prose/overview lands in P4.",
@@ -107,7 +107,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S2",
                   "title": "Add STATE_SCROLL, STATE_CLIENT_WIDTH, ORIG_CLIENT_RESIZED_HOOK + clear-list",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 0.5,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: state.sh's _STATE_RUNTIME_KEYS is the MANDATORY clear-list — clear_all_state unsets exactly those keys (see codebase_patterns.md §P3 and state.sh comments 'else they leak across picker sessions'). New ORIG_* saved keys are auto-caught by clear_all_state's `grep '@livepicker-orig-'`. The client-resized hook save/restore mirrors session-window-changed exactly (empirical_findings.md Finding 4; codebase_patterns.md §P4).\n2. INPUT: The existing readonly-constant + _STATE_RUNTIME_KEYS pattern in state.sh.\n3. LOGIC: Add `readonly STATE_SCROLL=\"@livepicker-scroll\"`, `readonly STATE_CLIENT_WIDTH=\"@livepicker-client-width\"` to the runtime STATE_* block; APPEND both to the _STATE_RUNTIME_KEYS space-list (MANDATORY). Add `readonly ORIG_CLIENT_RESIZED_HOOK=\"@livepicker-orig-client-resized\"` to the saved-state ORIG_* block (it is auto-cleared by the @livepicker-orig- grep). Do NOT initialize values here (activation does that in P1.M3.T1).\n4. OUTPUT: state.sh defines the 3 new constants; clear_all_state will tear down STATE_SCROLL + STATE_CLIENT_WIDTH via the updated clear-list. No behavior change yet.\n5. DOCS: none — internal state keys.",

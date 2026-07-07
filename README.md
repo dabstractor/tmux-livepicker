@@ -113,6 +113,11 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-highlight-bg`         | `yellow`   | Highlighted item background.                                                                         |
 | `@livepicker-show-count`           | `on`       | Show `index/total` in the picker.                                                                    |
 | `@livepicker-status-format-index`  | `0`        | Which status line the picker takes.                                                                  |
+| `@livepicker-nerd-fonts`            | `on`       | Opt-out for the search icon (tmux cannot detect the terminal font). `on` shows the icon; `off` shows query text only. |
+| `@livepicker-search-icon`           | `\uf002`   | The icon glyph shown before the query while typing. Default is `nf-fa-search` (U+F002); raw UTF-8 bytes in the source. |
+| `@livepicker-query-gap`             | `2`        | Spaces between the query and the first session tab while a query is active. |
+| `@livepicker-overflow-left`         | `<`        | Left overflow indicator (presence only; shown when `@livepicker-scroll > 0`). |
+| `@livepicker-overflow-right-format` | `+%d>`     | Right overflow indicator; `%d` = total hidden tabs (left + right combined). |
 
 Set any option before the plugin loads (or set it and reload tmux):
 
