@@ -1,0 +1,14 @@
+h1.0 Bug Fix Requirements
+ h2.0 Overview
+ h2.1 Critical Issues (Must Fix)
+ h2.2 Major Issues (Should Fix)
+  h3.0 Issue 1: link-window -a permanently shifts the driver's window indices (violates exact restoration)
+  h3.1 Issue 2: Window-mode preview of a window in the driver session creates a duplicate link
+  h3.2 Issue 3: Create-on-confirm with a sanitized name orphans the session and strands the user
+ h2.3 Minor Issues (Nice to Fix)
+  h3.3 Issue 4: TOCTOU race in the deferred-preview supersede guard can orphan a linked window
+  h3.4 Issue 5: §17 sentinel resolution does not handle session-context format specifiers
+  h3.5 Issue 6: Detached candidate window is resized by linking (pane dimensions change)
+ h2.4 Testing Summary
+---
+code:5 para:37 list:2
