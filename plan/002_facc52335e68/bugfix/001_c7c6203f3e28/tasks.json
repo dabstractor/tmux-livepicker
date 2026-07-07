@@ -58,7 +58,7 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Fix window-mode self-session duplicate link (Issue 2)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "In window mode, the self-session guard compares $S (a session:index token) to the bare session name, which never matches for the driver's own windows. Extend the guard to extract the session from the token.",
               "subtasks": [
                 {
@@ -79,7 +79,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S2",
                   "title": "Add window-mode driver-owned-window preview test",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S1"
@@ -105,7 +105,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Replace has-session gate with -P -F name capture in input-handler.sh",
-                  "status": "Researching",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See issue3_findings.md. The confirm branch at input-handler.sh line ~401 runs `tmux new-session ... && tmux has-session -t \"=$query\"`. tmux sanitizes '.' and ':' to '_', so has-session checks the WRONG name. The fix: use `new-session -P -F '#{session_name}'` to capture the actual created name, then switch to THAT name. Empirically verified: `new-session -P -F '#{session_name}' -d -s 'my.proj'` outputs `my_proj`.\n2. INPUT: input-handler.sh, the confirm branch's create-on-no-match path (lines ~379-405). The variables in scope: $query (the raw typed filter), $new_session_args (the new-session argv array, currently `(-d -s \"$query\")` optionally with zoxide `-c -n`), and _confirm_land_on_session (the switch+restore helper).\n3. LOGIC: Modify the create block:\n   (a) Add `-P -F '#{session_name}'` to new_session_args: change `local new_session_args=(-d -s \"$query\")` to `local new_session_args=(-d -P -F '#{session_name}' -s \"$query\")`.\n   (b) Replace the gate: change from `if tmux new-session ... && tmux has-session -t \"=$query\"; then _confirm_land_on_session \"$query\"` to `local created=\"\"; created=\"$(tmux new-session \"${new_session_args[@]}\" 2>/dev/null)\"; if [ -n \"$created\" ]; then _confirm_land_on_session \"$created\"`.\n   (c) Keep the else branch (restore.sh cancel) — it now fires only when creation genuinely failed (empty query, collision, etc.).\n   (d) Update the comment block (lines ~392-400) that documents the gate's rationale — the has-session gate was the bug; the -P capture is the fix.\n4. OUTPUT: input-handler.sh's create path captures the actual created name and switches to it. No orphan session is left behind. Empty query or collision → created=\"\" → cancel (correct).\n5. DOCS: [Mode A] Update the inline comment at the create block to document that the gate now captures the actual name via -P instead of checking the raw query. No README/CHANGELOG change here.",

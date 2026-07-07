@@ -210,3 +210,59 @@ test_window_preview_shows_highlighted_window() {
 		fail "window-mode preview linked the ACTIVE window (the bug)"
 	fi
 }
+
+# test_window_preview_driver_self_no_duplicate — Bugfix Issue 2 (window mode):
+# previewing a window that LIVES in the driver (current) session must NOT link it
+# (a session cannot usefully link its own window into itself — link-window would
+# silently create a DUPLICATE, rc=0). The self-session guard must fire for the
+# "session:index" token, select the target window, and leave the driver's window
+# list byte-identical (no duplicate @id). This is the window-mode counterpart of
+# test_self_session_no_link (session mode). Before S1/P1.M1.T2.S1, the guard's
+# bare `[ "$S" = "$current_session" ]` never matched the "driver:N" token, so
+# preview fell through to link-window and polluted the list — this test catches
+# that regression. Mirrors the dynamic-index detection of
+# test_window_preview_shows_highlighted_window (base-index may be 0 or 1;
+# @ids are non-sequential — @0 and @3 here — so detect dynamically).
+test_window_preview_driver_self_no_duplicate() {
+	lp_preview_seed_state
+	# Window mode: the self-session guard's window-mode branch gates on opt_type
+	# (lp_preview_seed_state does NOT set type — set it explicitly).
+	tmux set-option -g @livepicker-type window
+	# Pick a DRIVER-OWNED window token. The baseline driver has ≥2 windows
+	# (original + 'extra'); detect the NON-active one dynamically so the
+	# "correct window selected" assertion is meaningful (selection changes) and
+	# base-index-agnostic (the index comes straight from list-windows). @ids are
+	# clean @N, so space-delimit to avoid any ':' ambiguity.
+	local target target_idx target_id before_ids before_n
+	target="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index} #{window_id} #{window_active}' | awk '$3==0 {print $1" "$2; exit}')"
+	target_idx="${target%% *}"
+	target_id="${target#* }"
+	assert_contains "$target_id" "@" "non-active driver window resolved to a @id handle"
+	if [ -z "$target_idx" ] || [ -z "$target_id" ]; then
+		fail "test setup invalid: no non-active driver window (need ≥2 driver windows)"
+		return 0
+	fi
+	# Snapshot the driver's window list BEFORE (ids + count).
+	before_ids="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_id}')"
+	before_n="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_id}' | wc -l | tr -d '[:space:]')"
+	# Preview the DRIVER's own window (window-mode token). The self-session guard
+	# must fire (check_session = ${S%%:*} = "driver" = current_session) -> select
+	# the target, NO link, NO duplicate.
+	"$LIVEPICKER_SCRIPTS/preview.sh" "$TEST_DRIVER_SESSION:$target_idx"
+	# (1) PRD §7 self-session: NO link attempted -> @livepicker-linked-id is EMPTY.
+	assert_eq "$(tmux show-option -gqv @livepicker-linked-id)" "" \
+		"window-mode self-session leaves @livepicker-linked-id empty (no link)"
+	# (2) NO duplicate @id: the window-id list is unchanged (catches ANY change),
+	#     the count is unchanged, AND every id is unique (sort | uniq -d empty).
+	assert_eq "$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_id}')" "$before_ids" \
+		"window-mode self-session created no duplicate (window-id list unchanged)"
+	local after_n dups
+	after_n="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_id}' | wc -l | tr -d '[:space:]')"
+	assert_eq "$after_n" "$before_n" "driver window count unchanged (no duplicate link added)"
+	dups="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_id}' | sort | uniq -d)"
+	assert_eq "$dups" "" "no duplicate @id entries in the driver window list"
+	# (3) PRD §7: the CORRECT window was selected (active == the token's window),
+	#     not a duplicate occupying a shifted index.
+	assert_eq "$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_id}' -f '#{window_active}')" "$target_id" \
+		"window-mode self-session selects the highlighted (token's) window, not a duplicate"
+}
