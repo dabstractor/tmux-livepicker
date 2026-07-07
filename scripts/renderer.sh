@@ -125,9 +125,14 @@ render() {
 				else
 					ws_tpl="$reg_tpl"
 				fi
-				# literal swap: ${var//pat/rep} does not re-scan the replacement, so a name
-				# equal to __lp_tab__ cannot corrupt or recurse.
+				# literal swaps: ${var//pat/rep} does not re-scan the replacement, so a name
+				# equal to a placeholder cannot corrupt or recurse. __lp_tab__ is the sentinel
+				# WINDOW name (from #W); __lp_sentinel__ is the sentinel SESSION name (from #S /
+				# #{session_name} — Issue 5). Both map to the SAME candidate name ($esc_wname):
+				# each tab represents one candidate, whose display name is identical whether the
+				# theme used #W or #S (a #W+#S theme renders the name twice — accepted).
 				ws_seg="${ws_tpl//__lp_tab__/$esc_wname}"
+				ws_seg="${ws_seg//__lp_sentinel__/$esc_wname}"
 				if [ "$ws_first" -eq 1 ]; then
 					ws_out="$ws_seg"
 					ws_first=0

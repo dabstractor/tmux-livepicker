@@ -172,14 +172,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Fix sentinel resolution for session-context specifiers (Issue 5)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "The sentinel session name is unique per activation (PID+epoch), so session-state specifiers like #S/#{session_name} resolve to a non-swappable string. Use a stable sentinel session name (__lp_sentinel__) and add a second placeholder swap in the renderer.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Use stable sentinel session name + second renderer swap",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See issue4_5_6_findings.md §Issue 5. Empirically verified: `#W` against sentinel resolves to `__lp_tab__` (swappable). `#{session_name}` against sentinel resolves to `__lp_sent_123_456` (NOT swappable). The fix: make the sentinel session name a fixed placeholder `__lp_sentinel__` and swap BOTH `__lp_tab__` and `__lp_sentinel__` in the renderer.\n2. INPUT: Two files need changes:\n   (a) scripts/livepicker.sh, `_lp_resolve_tab_templates()` line ~76: `sent_sess=\"__lp_sent_$$_$(date +%s)\"` — the unique sentinel session name.\n   (b) scripts/renderer.sh, window-status render path line ~130: `ws_seg=\"${ws_tpl//__lp_tab__/$esc_wname}\"` — the sole placeholder swap.\n3. LOGIC:\n   (a) In livepicker.sh, BEFORE creating the sentinel session, add `tmux kill-session -t \"__lp_sentinel__\" 2>/dev/null || true` to clean any stray sentinel from a crashed prior run. Then change `sent_sess=\"__lp_sent_$$_$(date +%s)\"` to `sent_sess=\"__lp_sentinel__\"`.\n   (b) In renderer.sh, after the existing `__lp_tab__` swap (line ~130), add a second swap: `ws_seg=\"${ws_seg//__lp_sentinel__/$esc_wname}\"`. The `${var//pat/rep}` expansion does NOT re-scan the replacement, so no recursion risk (the existing comment at renderer.sh lines ~128-129 documents this).\n   (c) In livepicker.sh, the unexpanded-'#{` guard (lines ~102-103) already catches malformed themes. The sentinel-name swap is orthogonal — if the theme has BOTH #W and #S, both placeholders get swapped.\n4. OUTPUT: When a theme's window-status-format contains `#{session_name}` or `#S`, the sentinel resolution bakes `__lp_sentinel__` into the template (instead of `__lp_sent_PID_EPOCH`), and the renderer swaps it to the actual session name. Tabs render correctly for themes that use session-state specifiers.\n5. MOCKING: No external services. The sentinel session is created and destroyed within _lp_resolve_tab_templates on the live tmux server.\n6. DOCS: [Mode A] Update the inline comments at livepicker.sh line ~76 (sentinel session name) and renderer.sh line ~130 (second swap) to document the session-name placeholder. Reference PRD §17 and issue4_5_6_findings.md.",

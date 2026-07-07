@@ -68,12 +68,20 @@ _lp_resolve_tab_templates() {
 		return 0
 	fi
 
-	# (b) Create a unique hidden 2-window session (anchor + sentinel). CRITICAL (FINDING 1):
+	# (b) Create a hidden 2-window sentinel session (anchor + tab). CRITICAL (FINDING 1):
 	# `new-window -d -t "$sent_sess"` (bare) FAILS under base-index=1/renumber ("index in
 	# use"); the TRAILING-COLON form `-t "$sent_sess:"` picks a free slot. Force-select the
-	# anchor so __lp_tab__ is NON-active -> clean window-state specifiers. Unique name
-	# (PID+epoch) avoids a double-activation collision.
-	sent_sess="__lp_sent_$$_$(date +%s)"
+	# anchor so __lp_tab__ is NON-active -> clean window-state specifiers. The sentinel
+	# SESSION name is a FIXED placeholder `__lp_sentinel__` (not unique) so that a theme's
+	# SESSION-state specifiers (#S / #{session_name}) bake a STABLE placeholder the renderer
+	# can swap — mirroring the sentinel WINDOW name `__lp_tab__` (from #W). Issue 5.
+	# Pre-clean any stray sentinel left by a crashed prior run (new-session on an existing
+	# name would FAIL -> set-empty fallback -> plain tabs). Concurrency-safe: the modal
+	# @livepicker-mode guard (activate_main) blocks a 2nd activation, so no two sentinels
+	# coexist. RESIDUAL: a user session literally named __lp_sentinel__ would be destroyed
+	# here (vanishing probability; the fixed name is required for the renderer swap).
+	tmux kill-session -t "__lp_sentinel__" 2>/dev/null || true
+	sent_sess="__lp_sentinel__"
 	if ! tmux new-session -d -s "$sent_sess" -n __lp_anchor__ 2>/dev/null; then
 		set_state "$STATE_TAB_CURRENT_TMPL" ""
 		set_state "$STATE_TAB_INACTIVE_TMPL" ""
