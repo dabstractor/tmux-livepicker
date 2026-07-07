@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Fix link-window -a index shift (Issue 1)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "The -a flag inserts the linked preview window AFTER the active window, shifting subsequent indices when the active window is not the last. Remove -a so links append at the end, preserving original indices. Also strengthen existing tests to assert on window indices, not just IDs.",
               "subtasks": [
                 {
@@ -39,7 +39,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S2",
                   "title": "Add window-index assertion tests for multi-window driver",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1"
@@ -65,7 +65,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Extend self-session guard in preview.sh for window mode",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See issue1_2_findings.md §Issue 2. The self-session guard at preview.sh line ~126 checks `[ \"$S\" = \"$current_session\" ]`. In window mode, $S is a `session:index` token (e.g. `driver:1`), which never equals the bare session name. `${S%%:*}` correctly extracts the session name from the token.\n2. INPUT: preview.sh line ~126, the self-session guard block. $S is either a bare session name (session mode) or a `session:index` token (window mode). $current_session is always the bare driver session name (from @livepicker-orig-session).\n3. LOGIC: Before the guard comparison, compute the session to compare:\n   ```\n   local check_session=\"$S\"\n   if [ \"$(opt_type)\" = \"window\" ] && [ \"${S%%:*}\" != \"$S\" ]; then\n       check_session=\"${S%%:*}\"\n   fi\n   ```\n   Then change `[ \"$S\" = \"$current_session\" ]` to `[ \"$check_session\" = \"$current_session\" ]`. When the guard fires in window mode (driver-owned window), the self-session path must SELECT the specific window, not just ORIG_WINDOW. In the self-session block (currently lines ~126-138), when opt_type==window, resolve the src_id of $S's window and `tmux select-window -t \"$src_id\"` instead of (or in addition to) select-window ORIG_WINDOW. The src_id resolution code already exists later in the function (lines ~140-150 for window mode); it should be moved or duplicated before the self-session guard so the guard can select the correct window. OR: simpler approach — when opt_type==window and check_session==current_session, just `select-window -t \"$S\"` (the session:index token works directly with select-window in the driver session).\n4. OUTPUT: preview.sh's self-session guard fires for driver-owned windows in window mode. No duplicate link is created. The correct window is selected.\n5. DOCS: [Mode A] Update the inline comment at the self-session guard block to document the window-mode extension (session extraction from token). No README/CHANGELOG change here.",

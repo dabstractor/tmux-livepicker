@@ -181,3 +181,70 @@ test_window_confirm_preserves_custom_status_format() {
 	assert_eq "$sf2_a" "$sf2_b" "status-format[2] preserved across window-mode confirm"
 	assert_eq "$sf3_a" "$sf3_b" "status-format[3] preserved across window-mode confirm"
 }
+
+# test_preview_preserves_window_indices_cancel — Bugfix Issue 1 (test gap): the shipped
+# suite asserts on #{window_id} (invariant under an index shift) over single-window
+# drivers, so the `-a` index-shift bug escaped detection. This test snapshots the
+# driver's #{window_index}:#{window_name} ordering on a MULTI-window driver whose
+# active window is the FIRST (not last — the exact -a trigger), runs a full
+# activate -> preview-foreign-session -> cancel cycle, and asserts byte-equality.
+# PASSES with S1 (bare link-window appends at the END); FAILS with `-a` (mid-list
+# insert leaves a permanent gap after unlink). Mirrors test_restore_cancel_layout_exact's
+# attach -> activate -> next-session -> cancel pattern.
+test_preview_preserves_window_indices_cancel() {
+	attach_test_client
+	# 3-window driver: the 2 baseline windows (zsh, extra) + a 3rd. `-a` (not bare
+	# new-window) because the isolated server inherits base-index=1 and a bare
+	# new-window collides — same idiom as test_window_preview_shows_highlighted_window.
+	tmux new-window -t "$TEST_DRIVER_SESSION" -a -n third
+	# Select the FIRST (lowest-index) window by @id (robust to base-index) + rename it
+	# deterministically (pins auto-rename off -> fully stable snapshot). Active=FIRST
+	# is the bug's trigger (-a inserts AFTER the active window, shifting later windows).
+	local first_wid
+	first_wid="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index} #{window_id}' | sort -n | head -n1 | cut -d' ' -f2)"
+	tmux select-window -t "$first_wid"
+	tmux rename-window -t "$first_wid" first
+	# Snapshot the driver's window INDEX ordering BEFORE activation (the property the
+	# bug corrupts). #{window_index} is the oracle — NOT #{window_id} (invariant under
+	# a shift). e.g. "1:first\n2:extra\n3:third" (base-index=1).
+	local before
+	before="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index}:#{window_name}')"
+	# Full cycle: activate -> preview a FOREIGN session (links its window into the
+	# driver) -> cancel (restore unlinks the preview). next-session does not change the
+	# filter, so cancel is the full-restore (two-step cancel's exit step).
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"                  >/dev/null
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" next-session  >/dev/null
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" cancel        >/dev/null
+	local after
+	after="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index}:#{window_name}')"
+	assert_eq "$after" "$before" \
+		"driver window INDEX ordering unchanged after preview+cancel (multi-window driver, active=first)"
+}
+
+# test_preview_preserves_window_indices_confirm — Bugfix Issue 1 (confirm half): the
+# index shift fires in BOTH exit paths (issue1_2_findings.md). The confirm path is
+# structurally different from cancel: _confirm_land_on_session (input-handler.sh:106)
+# unlinks the DRIVER's preview window BEFORE switch-client (targets $orig_session:
+# $linked_id), then restore runs `keep` (no switch back). So the driver's window list
+# IS restored to its pre-activate state on confirm -> the before/after byte-equality
+# assertion is valid. Same multi-window/active=FIRST setup as the cancel test.
+test_preview_preserves_window_indices_confirm() {
+	attach_test_client
+	tmux new-window -t "$TEST_DRIVER_SESSION" -a -n third
+	local first_wid
+	first_wid="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index} #{window_id}' | sort -n | head -n1 | cut -d' ' -f2)"
+	tmux select-window -t "$first_wid"
+	tmux rename-window -t "$first_wid" first
+	local before
+	before="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index}:#{window_name}')"
+	# Full cycle: activate -> preview a FOREIGN session -> CONFIRM on it. Confirm lands
+	# the CLIENT on alpha, but the DRIVER is queried by name (=driver) so its window
+	# list (preview unlinked by _confirm_land_on_session) is observable regardless.
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"                  >/dev/null
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" next-session  >/dev/null   # highlight -> alpha (links preview)
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" confirm       >/dev/null   # unlink driver preview + switch to alpha + restore keep
+	local after
+	after="$(tmux list-windows -t "=$TEST_DRIVER_SESSION" -F '#{window_index}:#{window_name}')"
+	assert_eq "$after" "$before" \
+		"driver window INDEX ordering unchanged after preview+confirm (multi-window driver, active=first)"
+}
