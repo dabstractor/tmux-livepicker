@@ -57,8 +57,8 @@ source "$CURRENT_DIR/options.sh"
 source "$CURRENT_DIR/utils.sh"
 # shellcheck source=state.sh
 source "$CURRENT_DIR/state.sh"
-# shellcheck source=filter.sh
-source "$CURRENT_DIR/filter.sh"
+# shellcheck source=rank.sh
+source "$CURRENT_DIR/rank.sh"
 
 # _confirm_land_on_session TARGET — the shared "switch to a chosen session and
 # tear down to leave the client there" sequence. Called by BOTH the session-mode
@@ -122,7 +122,7 @@ _confirm_land_on_session() {
 # user types / backspaces / clears the query (PRD §3 story 3 + README "the preview
 # follows live"). Reconciles PRD §5 (which lists type/backspace as status-only) in
 # favour of §3 / the README. Mirrors the nav (next/prev) resolution: same
-# lp_build_filtered the renderer uses (so filtered[0] == the highlighted session),
+# lp_rank the renderer uses (so filtered[0] == the highlighted session),
 # same preview.sh call + `2>/dev/null || true` guard. type/backspace/cancel-clear
 # always reset @livepicker-index to 0, so the top match is ALWAYS filtered[0].
 # Empty filtered list (no matches) -> skip the preview (leave the prior pane as-is,
@@ -132,7 +132,7 @@ _lp_sync_preview_to_top_match() {
 	local -a _sync_filtered=()
 	_list="$(get_state "$STATE_LIST" "")"
 	_filt="$(get_state "$STATE_FILTER" "")"
-	mapfile -t _sync_filtered < <(lp_build_filtered "$_list" "$_filt")
+	mapfile -t _sync_filtered < <(lp_rank "$_list" "$_filt")
 	if [ "${#_sync_filtered[@]}" -eq 0 ]; then
 		_top=""
 	else
@@ -265,7 +265,7 @@ input_main() {
 			# and filtered[new_idx] is the session the renderer will highlight.
 			cur_list="$(get_state "$STATE_LIST" "")"
 			cur_filter="$(get_state "$STATE_FILTER" "")"
-			mapfile -t filtered < <(lp_build_filtered "$cur_list" "$cur_filter")
+			mapfile -t filtered < <(lp_rank "$cur_list" "$cur_filter")
 			L="${#filtered[@]}"
 			# Nothing matches -> no-op (never divide by zero; FINDING 5).
 			[ "$L" -eq 0 ] && return 0
@@ -291,7 +291,7 @@ input_main() {
 			#     (wrapping, reverse). Mirror of next-session.
 			cur_list="$(get_state "$STATE_LIST" "")"
 			cur_filter="$(get_state "$STATE_FILTER" "")"
-			mapfile -t filtered < <(lp_build_filtered "$cur_list" "$cur_filter")
+			mapfile -t filtered < <(lp_rank "$cur_list" "$cur_filter")
 			L="${#filtered[@]}"
 			[ "$L" -eq 0 ] && return 0
 			cur_index="$(get_state "$STATE_INDEX" "0")"
@@ -319,7 +319,7 @@ input_main() {
 			pick_type="$(opt_type)"
 			cur_list="$(get_state "$STATE_LIST" "")"
 			cur_filter="$(get_state "$STATE_FILTER" "")"
-			mapfile -t filtered < <(lp_build_filtered "$cur_list" "$cur_filter")
+			mapfile -t filtered < <(lp_rank "$cur_list" "$cur_filter")
 			L="${#filtered[@]}"
 			# Sanitize the stored index (a STRING option; mirror nav T2.S1).
 			cur_index="$(get_state "$STATE_INDEX" "0")"
@@ -432,7 +432,7 @@ input_main() {
 				set_state "$STATE_FILTER" ""
 				# Reset the highlight to the top filtered match (PRD §6). Always
 				# safe — the renderer clamps + handles FLEN=0 (empty filter matches
-				# ALL names; renderer FINDING 4 / filter.sh).
+				# ALL names; renderer FINDING 4 / rank.sh).
 				set_state "$STATE_INDEX" "0"
 				# Sync the live preview to the new top filtered match (PRD §3 / README;
 				# mirror next/prev). Always index 0 — these branches just reset it.

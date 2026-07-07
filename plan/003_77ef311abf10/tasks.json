@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "rank.sh fuzzy ranker (supersedes filter.sh)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Create scripts/rank.sh defining lp_rank LIST FILTER that prints matching session names best-first (drop-in for lp_build_filtered's callers), then switch the 6 call sites from filter.sh to rank.sh and retire filter.sh. Match rule: subsequence (chars in order, case-insensitive); non-matches hidden; empty filter = all names at score 0 in original tmux order (no reordering). Score: prefix > word-boundary > contiguous > early-position; stable tie-break.",
               "subtasks": [
                 {
@@ -44,7 +44,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S2",
                   "title": "Switch 6 filter.sh call sites to rank.sh; retire filter.sh",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1"

@@ -41,8 +41,8 @@ source "$CURRENT_DIR/options.sh"
 source "$CURRENT_DIR/utils.sh"
 # shellcheck source=state.sh
 source "$CURRENT_DIR/state.sh"
-# shellcheck source=filter.sh
-source "$CURRENT_DIR/filter.sh"
+# shellcheck source=rank.sh
+source "$CURRENT_DIR/rank.sh"
 
 render() {
 	local TYPE FG BG HFG HBG SHOW_COUNT_RAW SHOW_COUNT
@@ -94,7 +94,7 @@ render() {
 
 			mapfile -t ws_all < <(printf '%s' "$ws_list")
 			ws_total="${#ws_all[@]}"
-			mapfile -t ws_filtered < <(lp_build_filtered "$ws_list" "$ws_filter")
+			mapfile -t ws_filtered < <(lp_rank "$ws_list" "$ws_filter")
 			ws_flen="${#ws_filtered[@]}"
 
 			# no-match: mirror the plain path's no-match output (consistency; FINDING 6).
@@ -160,7 +160,7 @@ render() {
 	mapfile -t all < <(printf '%s' "$LIST")
 	TOTAL="${#all[@]}"
 
-	mapfile -t filtered < <(lp_build_filtered "$LIST" "$FILTER")
+	mapfile -t filtered < <(lp_rank "$LIST" "$FILTER")
 	FLEN="${#filtered[@]}"
 
 	out=""
