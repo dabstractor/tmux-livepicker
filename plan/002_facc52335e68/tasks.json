@@ -207,14 +207,14 @@
               "type": "Task",
               "id": "P1.M3.T2",
               "title": "tests/test_appearance.sh — §15.24 window-status tab validation",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Install representative window-status-format/window-status-current-format/window-status-separator fixtures on the isolated socket (tubular is not loaded there), activate with @livepicker-tab-style window-status, and assert the highlighted item matches the current-format styling and others the inactive-format; assert the inter-item gap matches the separator; assert empty/unresolvable format falls back to plain; assert tab-style plain (default) is unchanged.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
                   "title": "Write test_appearance.sh under the socket-isolated harness",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T3.S1"
