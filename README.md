@@ -48,6 +48,9 @@ timeline or its Alt-Tab style toggle.
 - **Confirm.** I press `Enter` and land on the selected session.
 - **Create.** I type `newproj` (no match) and press `Enter`; a new `newproj`
   session is created and I am switched to it.
+  Characters tmux disallows in
+  session names (such as `.`) are sanitized — `my.proj` becomes `my_proj` —
+  and you still land on the created session.
 - **Cancel.** I press `Escape` (or `Escape` twice) and everything is restored
   exactly as if I had never opened the picker.
 
