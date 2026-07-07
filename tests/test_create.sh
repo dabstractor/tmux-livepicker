@@ -90,3 +90,52 @@ test_window_mode_creates_nothing() {
 		pass "window mode created nothing ($q absent)"
 	fi
 }
+
+# test_create_sanitized_name_lands_on_session — Bugfix Issue 3 (P1.M1.T3.S2): typing a
+# query containing '.' (a PRD §6 typeable char) and confirming on a no-match list must
+# create the SANITIZED session (tmux maps '.' -> '_' => "my.proj" becomes "my_proj") AND
+# land the client on it — not orphan the session and strand the user on the driver.
+# Before P1.M1.T3.S1, the create gate checked `has-session -t "=$query"` (the ORIGINAL
+# unsanitized name), which always failed after a sanitized `new-session` => the just-created
+# session was orphaned and the client returned to the driver. S1 captures the actual name
+# via `new-session -P -F '#{session_name}'` and switches to THAT; this test locks that in.
+# Mirrors test_create_on_creates_and_activates EXACTLY (attach FIRST, @livepicker-create on
+# BEFORE activate, type char-by-char, confirm) save that the query is dotted.
+# @livepicker-zoxide-mode defaults to OFF (options.sh) so the zoxide branch never fires
+# here — the sibling test relies on the same default (no explicit pin).
+test_create_sanitized_name_lands_on_session() {
+	attach_test_client
+	tmux set-option -g @livepicker-create on
+	local before_n c
+	# Snapshot the session count BEFORE so the "no orphan" invariant is baseline-agnostic
+	# (setup_socket seeds driver/alpha/beta = 3; a future fixture change must not break this).
+	before_n="$(tmux list-sessions -F '#{session_name}' | wc -l | tr -d '[:space:]')"
+
+	"$LIVEPICKER_SCRIPTS/livepicker.sh"
+	for c in m y . p r o j; do
+		"$LIVEPICKER_SCRIPTS/input-handler.sh" type "$c"
+	done
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" confirm
+
+	# Issue 3: the session is created under the SANITIZED name ("my.proj" -> "my_proj").
+	if tmux has-session -t "=my_proj" 2>/dev/null; then
+		pass "create-on-enter created the sanitized session my_proj"
+	else
+		fail "create-on-enter created the sanitized session my_proj (has-session = my_proj failed — Issue 3)"
+	fi
+	# Issue 3 (belt-and-braces): the RAW query name does NOT exist (no duplicate under "my.proj").
+	if tmux has-session -t "=my.proj" 2>/dev/null; then
+		fail "create-on-enter left a session under the raw name my.proj (should be sanitized to my_proj)"
+	else
+		pass "create-on-enter created no session under the raw name my.proj"
+	fi
+	# Issue 3 (LOAD-BEARING): the client LANDED on the sanitized session, not stranded on the driver.
+	# (On the bug, restore.sh cancel returns the client to the driver -> this asserts my_proj.)
+	assert_eq "$(tmux display-message -p '#{session_name}')" "my_proj" \
+		"the client landed on the sanitized session my_proj (not stranded on the driver)"
+	# Issue 3: exactly ONE session was created (count = before + 1); no orphan of any name.
+	assert_eq "$(tmux list-sessions -F '#{session_name}' | wc -l | tr -d '[:space:]')" "$((before_n + 1))" \
+		"exactly one new session created (no orphan left behind)"
+	assert_eq "$(tmux show-option -gqv @livepicker-mode)" "" \
+		"picker torn down after confirm"
+}

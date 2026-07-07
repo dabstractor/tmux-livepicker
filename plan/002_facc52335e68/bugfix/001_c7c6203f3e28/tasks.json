@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Major Issues: State Corruption & User Stranding",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Fix the three Major issues that silently corrupt session/window state or strand the user. Issue 1 fires on the default code path for any user whose active window is not the last window.",
           "tasks": [
             {
@@ -98,7 +98,7 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "Fix create-on-confirm name sanitization (Issue 3)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "The create gate checks has-session with the raw query, but tmux sanitizes '.' and ':' to '_', so the gate fails on valid names, orphaning the created session. Replace the gate with a -P -F '#{session_name}' capture of the actual created name.",
               "subtasks": [
                 {
@@ -119,7 +119,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S2",
                   "title": "Add sanitized-name create test",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1"
@@ -147,14 +147,14 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Close TOCTOU race in deferred-preview supersede guard (Issue 4)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add a third seq check immediately before set_state LINKED_ID (after select-window) to prevent a stale deferred job from committing an orphaned link. Also add an idempotent pre-link check to prevent duplicate links from interleaved jobs.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Add third seq check + idempotent pre-link check in preview.sh",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1"
