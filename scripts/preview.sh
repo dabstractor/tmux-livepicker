@@ -182,9 +182,15 @@ preview_main() {
 		tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
 	fi
 
-	# Link S's active window into the current session (bare index -> free slot).
+	# Link S's active window into the current session. BARE link-window (no -a)
+	# appends at the next free index at the END, so NO existing window's index
+	# shifts and unlink restores the original list exactly. PRD §13 prescribes
+	# `-a` (insert AFTER active) — DEVIATION: that inserts mid-list when the active
+	# window isn't last, permanently shifting later windows (unlink leaves a gap;
+	# renumber-windows does NOT fire on unlink). Verified on tmux 3.6b. See
+	# plan/002_facc52335e68/bugfix/001_c7c6203f3e28/architecture/issue1_2_findings.md §Issue 1.
 	# GUARDED: on ANY failure, fall back (S1 stub -> exit non-zero; S2 -> capture-pane).
-	if ! tmux link-window -a -s "$src_id" -t "$current_session:" 2>/dev/null; then
+	if ! tmux link-window -s "$src_id" -t "$current_session:" 2>/dev/null; then
 		preview_fallback "$S"
 		return $?
 	fi
