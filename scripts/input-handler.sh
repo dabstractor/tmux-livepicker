@@ -384,24 +384,25 @@ input_main() {
 				# empty result (not indexed / below threshold / zoxide absent) falls
 				# back to a PLAIN create (no -c) rather than -c "" — more robust than
 				# sessionx, and still satisfies the create gate below.
-				local z_target="" new_session_args=(-d -s "$query")
+				local z_target="" created="" new_session_args=(-d -P -F '#{session_name}' -s "$query")
 				if [ "$(opt_zoxide)" = "on" ]; then
 					z_target="$(zoxide query "$query" 2>/dev/null)"
 					[ -n "$z_target" ] && new_session_args+=(-c "$z_target" -n "$z_target")
 				fi
-				# Robust create gate (FINDING 4/5). new-session SILENTLY SANITIZES
-				# names (':'->'_', leading '.'->'_') and returns rc=0 with a
-				# DIFFERENT name, so checking rc alone would strand the client
-				# (switch-client -t "=.hidden" -> rc=1, no such session). Require
-				# BOTH new-session rc=0 AND the EXACT $query name to now exist
-				# (has-session exact-match =). A duplicate cannot occur here: if
-				# an exact-$query session existed it would be a case-insensitive
-				# match -> in the filtered list -> this branch is never reached.
-				# Empty query -> new-session rc=1 -> gate false -> cancel.
-				if tmux new-session "${new_session_args[@]}" 2>/dev/null && tmux has-session -t "=$query" 2>/dev/null; then
-					_confirm_land_on_session "$query"
+				# Create gate (Issue 3 fix). new-session SILENTLY SANITIZES names
+				# (every '.' and ':' -> '_') and returns rc=0 with a DIFFERENT name.
+				# The OLD gate (has-session -t "=$query") checked the ORIGINAL
+				# unsanitized query, so it always failed after a sanitized success ->
+				# the just-created session was orphaned and the client stranded.
+				# FIX: -P -F '#{session_name}' captures the ACTUAL name tmux created;
+				# gate on a non-empty capture and switch to THAT name. Empty query or
+				# a collision (sanitized name exists) -> new-session rc=1, stdout empty
+				# -> created="" -> cancel (NO orphan). See research/issue3_fix_findings.md.
+				created="$(tmux new-session "${new_session_args[@]}" 2>/dev/null)"
+				if [ -n "$created" ]; then
+					_confirm_land_on_session "$created"
 				else
-					# Invalid/sanitized/empty name -> cancel (PRD §6 Confirm).
+					# Genuine failure (empty/collision) -> cancel (PRD §6 Confirm).
 					"$CURRENT_DIR/restore.sh" cancel
 				fi
 				return 0
