@@ -47,6 +47,8 @@ readonly STATE_TAB_CURRENT_TMPL="@livepicker-tab-current-tmpl"   # cached window
 readonly STATE_TAB_INACTIVE_TMPL="@livepicker-tab-inactive-tmpl" # cached window-status-format         (PRD §17; written P1.M1.T2, read P1.M1.T3; cleared via _STATE_RUNTIME_KEYS)
 readonly STATE_PREVIEW_SEQ="@livepicker-preview-seq"        # monotonic supersede counter (PRD §18; external_tmux_behavior.md Q6): bumped by the fire helper (P1.M2.T3), re-checked by preview.sh (P1.M2.T2) before mutating; init 0 at activate; cleared via _STATE_RUNTIME_KEYS
 readonly STATE_PREVIEW_TARGET="@livepicker-preview-target"  # latest session/window token (PRD §18): written by the fire helper (P1.M2.T3), read/rechecked by preview.sh (P1.M2.T2); cleared via _STATE_RUNTIME_KEYS
+readonly STATE_SCROLL="@livepicker-scroll"            # viewport scroll offset (PRD §19 §3.32): written by input-handler scroll-into-view/reset (P1.M3.T2); read by the renderer viewport slice; init 0 at activate (P1.M3.T1); cleared via _STATE_RUNTIME_KEYS
+readonly STATE_CLIENT_WIDTH="@livepicker-client-width"  # invoking-client width cache (PRD §10 §3.35): captured at activate (P1.M3.T1) via display-message -p '#{client_width}', refreshed by the client-resized hook; the renderer measures the viewport against this (no per-keystroke tmux round-trip, §18); cleared via _STATE_RUNTIME_KEYS
 
 # --- saved-state CONTRACT keys (PRD §9; written by activate, read by restore) ---
 readonly ORIG_SESSION="@livepicker-orig-session"
@@ -56,11 +58,12 @@ readonly ORIG_KEY_TABLE="@livepicker-orig-key-table"
 readonly ORIG_STATUS="@livepicker-orig-status"                         # status line-count value
 readonly ORIG_RENUMBER="@livepicker-orig-renumber-windows"
 readonly ORIG_HOOK="@livepicker-orig-session-window-changed"           # FULL show-hooks output (multi-line)
+readonly ORIG_CLIENT_RESIZED_HOOK="@livepicker-orig-client-resized"        # FULL show-hooks output (the IDENTICAL-shape mirror of ORIG_HOOK; §P4); saved/restored by activate/restore (P1.M3.T1); auto-cleared by clear_all_state's grep '@livepicker-orig-'
 readonly ORIG_STATUS_FORMAT_INDICES="@livepicker-orig-status-format-indices"
 readonly ORIG_STATUS_FORMAT_PREFIX="@livepicker-orig-status-format-"   # +N suffix (bracket-free)
 
 # keys clear_all_state unsets explicitly (STATE_TYPE deliberately absent: it is config)
-readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET"
+readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH"
 
 # $1: STATE_* key, $2: value. Writes a runtime @livepicker-* option (delegates to
 # utils tmux_set_opt). Caller passes a STATE_* constant, not a raw string.

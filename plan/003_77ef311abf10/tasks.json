@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Foundation: rank.sh, layout.sh, options, state keys",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Add the two new sourced libs (rank.sh superseding filter.sh; layout.sh viewport math), the new options, and the new runtime state keys. No user-visible behavior change yet (the libs are unused until M2/M3); this lands the integration seams the later milestones plug into.",
           "tasks": [
             {
@@ -86,7 +86,7 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "New options + state keys (integration seams)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Add the new @livepicker-* option accessors and runtime/saved-state keys as inert seams. Add: opt_nerd_fonts, opt_search_icon, opt_query_gap, opt_overflow_left, opt_overflow_right_format. Add STATE_SCROLL, STATE_CLIENT_WIDTH, ORIG_CLIENT_RESIZED_HOOK. Do NOT remove opt_show_count here (it stays referenced by renderer until M2.T3 removes its last consumer atomically).",
               "subtasks": [
                 {
@@ -107,7 +107,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S2",
                   "title": "Add STATE_SCROLL, STATE_CLIENT_WIDTH, ORIG_CLIENT_RESIZED_HOOK + clear-list",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 0.5,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: state.sh's _STATE_RUNTIME_KEYS is the MANDATORY clear-list — clear_all_state unsets exactly those keys (see codebase_patterns.md §P3 and state.sh comments 'else they leak across picker sessions'). New ORIG_* saved keys are auto-caught by clear_all_state's `grep '@livepicker-orig-'`. The client-resized hook save/restore mirrors session-window-changed exactly (empirical_findings.md Finding 4; codebase_patterns.md §P4).\n2. INPUT: The existing readonly-constant + _STATE_RUNTIME_KEYS pattern in state.sh.\n3. LOGIC: Add `readonly STATE_SCROLL=\"@livepicker-scroll\"`, `readonly STATE_CLIENT_WIDTH=\"@livepicker-client-width\"` to the runtime STATE_* block; APPEND both to the _STATE_RUNTIME_KEYS space-list (MANDATORY). Add `readonly ORIG_CLIENT_RESIZED_HOOK=\"@livepicker-orig-client-resized\"` to the saved-state ORIG_* block (it is auto-cleared by the @livepicker-orig- grep). Do NOT initialize values here (activation does that in P1.M3.T1).\n4. OUTPUT: state.sh defines the 3 new constants; clear_all_state will tear down STATE_SCROLL + STATE_CLIENT_WIDTH via the updated clear-list. No behavior change yet.\n5. DOCS: none — internal state keys.",
@@ -134,14 +134,14 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Plain render path §19 restructure (query-empty / query-active / no-match)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Restructure the plain (non-window-status) render path in render() to follow §19: query-empty shows only tabs justified per status-justify (no icon/query/gap/count); query-active shows icon+query+gap+tabs at column 0; no-match shows icon+query+(no match). Drop the SHOW_COUNT branch from the plain path. Use lp_rank (ranked order) and lp_disp_width (from layout.sh).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Restructure render() plain path into §19 layout; drop plain SHOW_COUNT branch",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S2",
@@ -166,14 +166,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Viewport windowing + overflow indicators (plain path)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Window the ranked list by @livepicker-scroll to width T (via layout.sh lp_viewport) and render the overflow indicators: right +N> (%d = TOTAL hidden, left+right combined) and left < (presence only, when scroll>0). Both can show at once (< …tabs… +N>); neither when all fit. Apply to the plain query-active and query-empty paths.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Window ranked list by scroll + render overflow indicators",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",
