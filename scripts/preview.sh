@@ -79,7 +79,7 @@ preview_fallback() {
 # argv[1] = candidate session name S.
 preview_main() {
 	local S="${1:-}" expected_seq="${2:-}"
-	local current_session orig_window linked_id src_id w_sess w_idx cur_seq
+	local current_session orig_window linked_id src_id w_sess w_idx cur_seq check_session
 
 	# The session we preview INSIDE (the driver). Equal to the live client session
 	# during browsing (Invariant A); client-independent (FINDING 9).
@@ -119,17 +119,34 @@ preview_main() {
 	# mode == live (default): fall through to the link flow below.
 
 	# Self-session guard (PRD §7; FINDING 6). Do NOT link — would create an
-	# in-session duplicate; instead show the user their own session. S2
-	# refinement (contract §3): first drop any prior preview linked into the
-	# driver (source keeps it — S1 FINDING 1; no -k, || true — S1 FINDING 2),
-	# clear LINKED_ID (tmux_unset_opt = -gu — FINDING E; matches state.sh
-	# teardown), THEN select the original window.
-	if [ -n "$current_session" ] && [ "$S" = "$current_session" ]; then
+	# in-session duplicate; instead select the user's own window. Bugfix ISSUE 2
+	# (window-mode extension): in window mode $S is a "session:index" token
+	# (e.g. "driver:1") which never equals the bare session name, so the OLD bare
+	# comparison let driver-owned windows fall through to link-window, silently
+	# creating a DUPLICATE (link-window rc=0 on already-linked windows). Fix:
+	# compare ${S%%:*} (the token's session) — the SAME idiom used at lines 62/144.
+	# Session mode ($S has no colon) is the identity -> zero regression. When the
+	# guard fires in window mode, select the SPECIFIC highlighted window ($S token
+	# works directly with select-window); in session mode, select ORIG_WINDOW as
+	# before. (research/self_session_window_mode_findings.md FINDING 2/3/5.)
+	check_session="$S"
+	if [ "$(opt_type)" = "window" ] && [ "${S%%:*}" != "$S" ]; then
+		check_session="${S%%:*}"
+	fi
+	if [ -n "$current_session" ] && [ "$check_session" = "$current_session" ]; then
+		# Drop any prior CROSS-session preview linked into the driver (source keeps
+		# it — S1 FINDING 1; no -k, || true — S1 FINDING 2), then clear LINKED_ID.
 		if [ -n "$linked_id" ]; then
 			tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
 			tmux_unset_opt "$STATE_LINKED_ID"
 		fi
-		[ -n "$orig_window" ] && tmux select-window -t "$orig_window" 2>/dev/null || true
+		# Select the target window: window mode -> the specific "session:index"
+		# ($S); session mode -> the original active window. NO link in either case.
+		if [ "$(opt_type)" = "window" ]; then
+			tmux select-window -t "$S" 2>/dev/null || true
+		else
+			[ -n "$orig_window" ] && tmux select-window -t "$orig_window" 2>/dev/null || true
+		fi
 		return 0
 	fi
 
