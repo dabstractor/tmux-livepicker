@@ -171,6 +171,23 @@ preview_main() {
 		return $?
 	fi
 
+	# IDEMPOTENT PRE-LINK CHECK (bugfix Issue 4 / issue4_5_6_findings.md §Issue 4 part B).
+	# Probe whether src_id is ALREADY linked into the driver session — an AUTHORITATIVE
+	# check that does not rely on @livepicker-linked-id (which a racing deferred job may
+	# not have committed yet, or which clear_all_state may have unset). If src_id is
+	# already here (a re-preview of the same window, OR a losing interleave that already
+	# linked it), skip unlink+link — re-linking would silently create a DUPLICATE
+	# (link-window rc=0 on already-linked windows — FINDING 4) — and just select +
+	# record, exactly like the duplicate-guard below. No seq guard here: this fires only
+	# when src_id is already linked, so select+set_state are non-destructive and the
+	# duplicating link-window is skipped (research FINDING 6). GUARD 1/2/3 own supersede.
+	if tmux list-windows -t "=$current_session" -F '#{window_id}' 2>/dev/null \
+		| grep -Fxq "$src_id"; then
+		tmux select-window -t "$src_id" 2>/dev/null || true
+		set_state "$STATE_LINKED_ID" "$src_id"
+		return 0
+	fi
+
 	# DUPLICATE GUARD (FINDING 4/5). Re-previewing the SAME session (linked_id ==
 	# src_id, e.g. single-match wrap): the window is already linked + selected.
 	# Skip unlink AND link (re-linking would silently duplicate). Just ensure shown.
@@ -185,7 +202,10 @@ preview_main() {
 	# unlink+link+select+set_state entirely, so no link is left untracked). Do NOT
 	# move this to before the final select-window: that fires AFTER link-window but
 	# BEFORE set_state LINKED_ID -> a stale job would link its window then bail,
-	# leaving an UNTRACKED link (a leak). (research FINDING 5.)
+	# leaving an UNTRACKED link (a leak). (research FINDING 5.) NOTE: this warning is
+	# about THIS guard's OWN placement (stay before the unlink). GUARD 3 below is an
+	# ADDITIVE late commit-clobber check (Issue 4) placed intentionally before
+	# set_state; it does NOT move or replace this guard.
 	if [ -n "$expected_seq" ]; then
 		[ "$(get_state "$STATE_PREVIEW_SEQ" "0")" != "$expected_seq" ] && return 0
 	fi
@@ -216,6 +236,24 @@ preview_main() {
 	# (Invariant A). It DOES fire session-window-changed (suppressed globally by
 	# P1.M4.T4.S2 — not this task's concern).
 	tmux select-window -t "$src_id" 2>/dev/null || true
+
+	# GUARD 3 — third supersede re-check before the LINKED_ID commit (bugfix Issue 4 /
+	# issue4_5_6_findings.md §Issue 4 part A; PRD §18 contract #3). Closes the
+	# commit-clobber TOCTOU window: between GUARD 2 (above) and here the function
+	# performed unlink + link + select (three tmux round-trips). If a newer keystroke /
+	# confirm / cancel advanced STATE_PREVIEW_SEQ (or clear_all_state unset it) during
+	# those round-trips, THIS job is stale -> bail BEFORE set_state so it does NOT
+	# overwrite the newer job's @livepicker-linked-id commit. Placed AFTER select-window
+	# and BEFORE set_state (the contract is explicit: do NOT move earlier — a pre-link
+	# guard would let a stale job link then bail, leaving an UNTRACKED link). Residual:
+	# a stale job that already linked+selected a now-superseded window is unavoidable
+	# without per-window locking (tmux has none); GUARD 3 prevents the WORSE outcome
+	# (clobbering the newer commit -> mis-tracked -> wrong-window unlink on next
+	# nav/restore), and the idempotent pre-link check above prevents a same-target
+	# duplicate. GUARD 2 above remains the primary early no-op guard; THIS is additive.
+	if [ -n "$expected_seq" ]; then
+		[ "$(get_state "$STATE_PREVIEW_SEQ" "0")" != "$expected_seq" ] && return 0
+	fi
 
 	# Track the linked id (handle for the next unlink + for restore P1.M5).
 	set_state "$STATE_LINKED_ID" "$src_id"
