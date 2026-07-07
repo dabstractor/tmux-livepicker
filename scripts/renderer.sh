@@ -51,7 +51,8 @@ render() {
 	local LIST FILTER IDX
 	local -a all=() filtered=()
 	local TOTAL FLEN
-	local out seg i cidx first esc_filter esc_name SCROLL icon gap tabs justify width pad padw tabs_w
+	local out seg i cidx first esc_filter esc_name SCROLL icon gap tabs justify width pad padw tabs_w \
+		vis_start vis_end left_ind right_ind qbw T0 vp_T th ind_w left_present new_lp ovl ovr_fmt ranked
 
 	TYPE="$(opt_type)"
 	FG="$(opt_fg)"
@@ -186,12 +187,74 @@ render() {
 	[ "$cidx" -ge "$FLEN" ] && cidx=$((FLEN - 1))
 	[ "$cidx" -lt 0 ] && cidx=0
 
-	# Build the tab segments (shared by query-empty + query-active): each name # escaped,
-	# styled; the highlighted index uses HFG/HBG; joined by a single space (plain mode).
+	# --- viewport windowing + overflow indicators (PRD §19 §3.32/§3.33) ---
+	# Available tab width T = client_width − query_block − active indicators. The indicator
+	# presence depends on hidden counts (circular with the viewport); resolve via probe +
+	# converge (research FINDING 2). layout.sh lp_viewport does the slice; the renderer
+	# computes T (layout FINDING 5: layout.sh does NOT resolve the circle).
+	width="$(get_state "$STATE_CLIENT_WIDTH" "0")"
+	[[ "$width" =~ ^[0-9]+$ ]] || width=0
+
+	# Default: no windowing (width unknown -> legacy full-list render, no indicators; FINDING 6).
+	vis_start=0
+	vis_end=$((FLEN - 1))
+	left_ind=""
+	right_ind=""
+	if [ "$width" -gt 0 ]; then
+		# query_block width: icon + query + gap (query-ACTIVE only; 0 when query empty). FINDING 5.
+		qbw=0
+		if [ -n "$FILTER" ]; then
+			qbw=$(( ${#icon} + $(lp_disp_width "$FILTER") ))
+			[[ "$(opt_query_gap)" =~ ^[0-9]+$ ]] && qbw=$(( qbw + $(opt_query_gap) ))
+		fi
+		T0=$(( width - qbw ))
+		# The ranked list lp_viewport measures (newline-joined filtered names).
+		ranked="$(printf '%s\n' "${filtered[@]}")"
+		# Probe (no indicator reservation).
+		lp_viewport "$ranked" "$T0" "$SCROLL" "$cidx" 1
+		th=$(( LPV_HIDDEN_LEFT + LPV_HIDDEN_RIGHT ))
+		if [ "$th" -eq 0 ]; then
+			# Fits entirely -> no indicators; lp_viewport already clamped scroll to 0.
+			vis_start=$LPV_START
+			vis_end=$LPV_END
+		else
+			# Overflow -> resolve the indicator circle (bounded; converges ≤2 iters; FINDING 2).
+			ovl="$(opt_overflow_left)"
+			ovr_fmt="$(opt_overflow_right_format)"
+			left_present=0
+			[ "$LPV_HIDDEN_LEFT" -gt 0 ] && left_present=1
+			while :; do
+				[ "$left_present" = 1 ] && left_ind="$ovl" || left_ind=""
+				th=$(( LPV_HIDDEN_LEFT + LPV_HIDDEN_RIGHT ))
+				right_ind="${ovr_fmt//%d/$th}"
+				ind_w=$(( $(lp_disp_width "$left_ind") + $(lp_disp_width "$right_ind") ))
+				vp_T=$(( T0 - ind_w ))
+				lp_viewport "$ranked" "$vp_T" "$SCROLL" "$cidx" 1
+				new_lp=0
+				[ "$LPV_HIDDEN_LEFT" -gt 0 ] && new_lp=1
+				[ "$new_lp" = "$left_present" ] && break
+				left_present="$new_lp"   # left flipped off->on; loop once more (monotonic)
+			done
+			vis_start=$LPV_START
+			vis_end=$LPV_END
+			# Final indicator strings from the CONVERGED counts; styled as chrome (FG/BG).
+			th=$(( LPV_HIDDEN_LEFT + LPV_HIDDEN_RIGHT ))
+			if [ "$LPV_HIDDEN_LEFT" -gt 0 ]; then
+				left_ind="#[fg=$FG,bg=$BG]${ovl}#[default]"
+			else
+				left_ind=""
+			fi
+			[ "$th" -gt 0 ] && right_ind="#[fg=$FG,bg=$BG]${ovr_fmt//%d/$th}#[default]" || right_ind=""
+		fi
+	fi
+
+	# Build the tab segments from the VISIBLE slice [vis_start, vis_end] (PRD §3.32). Each name
+	# # escaped, styled; the highlighted index uses HFG/HBG; joined by a single space (plain mode).
+	# cidx is guaranteed in the slice (scroll-into-view; or all-rendered when width=0). FINDING 11.
 	first=1
 	tabs=""
-	for i in "${!filtered[@]}"; do
-		esc_name="${filtered[$i]//\#/##}"   # display escape: every # -> ## (tmux literal-#; §P6)
+	for (( i = vis_start; i <= vis_end; i++ )); do
+		esc_name="${filtered[$i]//\#/##}"
 		if [ "$i" -eq "$cidx" ]; then
 			seg="#[fg=$HFG,bg=$HBG]${esc_name}#[default]"
 		else
@@ -206,32 +269,34 @@ render() {
 	done
 
 	if [ -z "$FILTER" ]; then
-		# --- (a) QUERY EMPTY (PRD §19 §3.30): ONLY the tabs, positioned per status-justify.
-		# No icon/query/gap/count. tmux does NOT justify #() output, so the renderer EMULATES
-		# it with leading padding spaces (§P6). status-justify is ONE read per redraw (allowed).
-		justify="$(tmux show-options -g -v status-justify 2>/dev/null)"
-		[ -z "$justify" ] && justify=left
-		width="$(get_state "$STATE_CLIENT_WIDTH" "0")"
-		[[ "$width" =~ ^[0-9]+$ ]] || width=0
-		pad=""
-		if [ "$justify" != left ] && [ "$width" -gt 0 ]; then
-			tabs_w="$(lp_disp_width "$tabs")"   # strip #[...] styles, count codepoints
-			if [ "$tabs_w" -lt "$width" ]; then
-				case "$justify" in
-					centre | absolute-centre) padw=$(( (width - tabs_w) / 2 )) ;;
-					right) padw=$(( width - tabs_w )) ;;
-					*) padw=0 ;;
-				esac
-				[ "$padw" -gt 0 ] && pad="$(printf '%*s' "$padw" '')"
+		# (a) QUERY EMPTY (PRD §19 §3.30): ONLY the tabs.
+		if [ -n "$left_ind" ] || [ -n "$right_ind" ]; then
+			# Overflow -> justification is MOOT; flow left-to-right from column 0 with indicators.
+			printf '%s' "${left_ind}${tabs}${right_ind}"
+		else
+			# Fits -> emulate status-justify (leading padding). width already read above.
+			justify="$(tmux show-options -g -v status-justify 2>/dev/null)"
+			[ -z "$justify" ] && justify=left
+			pad=""
+			if [ "$justify" != left ]; then
+				tabs_w="$(lp_disp_width "$tabs")"
+				if [ "$tabs_w" -lt "$width" ]; then
+					case "$justify" in
+						centre | absolute-centre) padw=$(( (width - tabs_w) / 2 )) ;;
+						right) padw=$(( width - tabs_w )) ;;
+						*) padw=0 ;;
+					esac
+					[ "$padw" -gt 0 ] && pad="$(printf '%*s' "$padw" '')"
+				fi
 			fi
+			printf '%s' "${pad}${tabs}"
 		fi
-		printf '%s' "${pad}${tabs}"
 		return 0
 	fi
 
-	# --- (b) QUERY ACTIVE (PRD §19 §3.31): <icon><query><gap><tabs> at column 0.
-	# status-justify is SUSPENDED (pinned-left). Query is # escaped; gap is plain spaces.
-	printf '%s' "#[fg=$FG,bg=$BG]${icon}${esc_filter}#[default]${gap}${tabs}"
+	# (b) QUERY ACTIVE (PRD §19 §3.31): <icon><query><gap>[<left_ind>]<tabs>[<right_ind>] at column 0.
+	# status-justify SUSPENDED (pinned-left). Query # escaped; gap plain spaces; indicators chrome.
+	printf '%s' "#[fg=$FG,bg=$BG]${icon}${esc_filter}#[default]${gap}${left_ind}${tabs}${right_ind}"
 }
 
 render || printf '%s' '#[fg=red]livepicker: renderer error#[default]'
