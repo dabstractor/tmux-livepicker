@@ -40,7 +40,7 @@
 #
 # DETERMINISM: the isolated socket sources the user tmux.conf -> @livepicker-fg
 # "#ffffff" + a tubular window-status-separator glyph are dormant. lp_appearance_seed
-# pins the colors/type/show-count; each window-status test sets the separator. So
+# pins the colors/type; each window-status test sets the separator. So
 # every assertion is independent of the user's config. display-message -p PRESERVES
 # #[...] styles verbatim in stdout (research §2) -> the style assertions are real.
 #
@@ -54,7 +54,7 @@
 # user's tmux.conf (which sets @livepicker-fg "#ffffff" on the isolated socket).
 # Colors: fg/bg=default, highlight-fg=black, highlight-bg=yellow (the PRD defaults),
 # so the plain path emits EXACT bytes (#(fg=default,bg=default) / #[fg=black,bg=yellow]).
-# show-count OFF -> no query suffix -> exact-output assert_eq is safe. The caller
+# no count suffix is ever emitted (PRD §19) -> exact-output assert_eq is safe. The caller
 # sets @livepicker-tab-style + the cache templates + window-status-separator itself.
 lp_appearance_seed() {
 	tmux set-option -g @livepicker-type session
@@ -62,7 +62,6 @@ lp_appearance_seed() {
 	tmux set-option -g @livepicker-bg             "default"
 	tmux set-option -g @livepicker-highlight-fg   "black"
 	tmux set-option -g @livepicker-highlight-bg   "yellow"
-	tmux set-option -g @livepicker-show-count     off
 	tmux set-option -g @livepicker-list   "$1"
 	tmux set-option -g @livepicker-filter "${2:-}"
 	tmux set-option -g @livepicker-index  "${3:-0}"
@@ -99,7 +98,7 @@ test_window_status_highlight_uses_current_format() {
 # (b) test_window_status_separator — PRD §17 Mapping: the inter-item gap is
 # window-status-separator. Set it to a known string ('|') and assert the renderer
 # joins the tabs with EXACTLY that separator (NOT a plain space). Exact-output
-# assertion (show-count off -> no suffix); the highlight is index 1 (beta, current).
+# assertion (no count suffix per PRD §19); the highlight is index 1 (beta, current).
 test_window_status_separator() {
 	lp_appearance_seed $'alpha\nbeta\ngamma' "" 1
 	tmux set-option -g @livepicker-tab-style window-status
@@ -167,7 +166,6 @@ test_tab_style_plain_unchanged() {
 test_sentinel_resolution_end_to_end() {
 	attach_test_client
 	tmux set-option -g @livepicker-tab-style window-status
-	tmux set-option -g @livepicker-show-count off
 	# representative theme formats: #W resolves to the sentinel name __lp_tab__.
 	tmux set-option -gw window-status-current-format "#[fg=red,bold]#W#[default]"
 	tmux set-option -gw window-status-format          "#[fg=blue]#W#[default]"

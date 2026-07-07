@@ -47,113 +47,22 @@ source "$CURRENT_DIR/rank.sh"
 source "$CURRENT_DIR/layout.sh"
 
 render() {
-	local TYPE FG BG HFG HBG SHOW_COUNT_RAW SHOW_COUNT
+	local TYPE FG BG HFG HBG
 	local LIST FILTER IDX
 	local -a all=() filtered=()
 	local TOTAL FLEN
 	local out seg i cidx first esc_filter esc_name SCROLL icon gap tabs justify width pad padw tabs_w \
-		vis_start vis_end left_ind right_ind qbw T0 vp_T th ind_w left_present new_lp ovl ovr_fmt ranked
+		vis_start vis_end left_ind right_ind qbw T0 vp_T th ind_w left_present new_lp ovl ovr_fmt ranked \
+		tab_style cur_tpl reg_tpl sep sep_w
 
 	TYPE="$(opt_type)"
 	FG="$(opt_fg)"
 	BG="$(opt_bg)"
 	HFG="$(opt_highlight_fg)"
 	HBG="$(opt_highlight_bg)"
-	SHOW_COUNT_RAW="$(opt_show_count)"
-	case "${SHOW_COUNT_RAW,,}" in
-		'' | off | 0 | no | false | disable) SHOW_COUNT=0 ;;
-		*) SHOW_COUNT=1 ;;
-	esac
 
-	# --- PRD §17: window-status render path (theme-matched tabs) ---
-	# Self-contained early-return. Entered only when @livepicker-tab-style is
-	# window-status AND both cached templates are non-empty (cached once at activation
-	# by _lp_resolve_tab_templates, P1.M1.T2.S1). If EITHER fails, execution falls
-	# through to the existing plain path below (untouched). The cached templates are
-	# fully-resolved #[...]-styled strings with __lp_tab__ baked in where #W was; here
-	# we swap __lp_tab__ -> each # escaped session name and join with
-	# window-status-separator. #[...] styling in #() output IS applied
-	# (external_tmux_behavior.md Q2); #{...} is NOT (why pre-resolution is needed).
-	# See research/renderer_ws_branch_findings.md (FINDING 1-8).
-	if [ "$(opt_tab_style)" = "window-status" ]; then
-		local cur_tpl reg_tpl
-		local ws_list ws_filter ws_idx esc_wfilter ws_sep ws_out ws_first ws_total
-		local -a ws_all=() ws_filtered=()
-		local ws_flen ws_cidx ws_i ws_name esc_wname ws_tpl ws_seg
-
-		cur_tpl="$(get_state "$STATE_TAB_CURRENT_TMPL" "")"
-		reg_tpl="$(get_state "$STATE_TAB_INACTIVE_TMPL" "")"
-		# If EITHER template is empty (resolution failed -> set-empty by the writer, or
-		# helper not yet run -> unset), fall through to the plain path. (FINDING 3:
-		# get_state + [ -n ] fully honors the writer's set-empty contract and is leaner
-		# than a tmux_is_set probe, which adds no branching signal.)
-		if [ -n "$cur_tpl" ] && [ -n "$reg_tpl" ]; then
-			ws_list="$(get_state "$STATE_LIST" "")"
-			ws_filter="$(get_state "$STATE_FILTER" "")"
-			esc_wfilter="${ws_filter//\#/##}"   # display escape: every # -> ## (tmux literal-#; Issue 3)
-			ws_idx="$(get_state "$STATE_INDEX" "0")"
-			ws_sep="$(tmux show-options -gwv window-status-separator 2>/dev/null)"
-			[ -z "$ws_sep" ] && ws_sep=" "       # default to a space (window option; -gwv scope)
-
-			mapfile -t ws_all < <(printf '%s' "$ws_list")
-			ws_total="${#ws_all[@]}"
-			mapfile -t ws_filtered < <(lp_rank "$ws_list" "$ws_filter")
-			ws_flen="${#ws_filtered[@]}"
-
-			# no-match: mirror the plain path's no-match output (consistency; FINDING 6).
-			if [ "$ws_flen" -eq 0 ]; then
-				if [ "$SHOW_COUNT" -eq 1 ]; then
-					printf '%s' "#[fg=$FG,bg=$BG]query> $esc_wfilter (no match) 0/$ws_total#[default]"
-				else
-					printf '%s' "#[fg=$FG,bg=$BG]query> $esc_wfilter (no match)#[default]"
-				fi
-				return 0
-			fi
-
-			# clamp cidx (same rule as the plain path; 0-based, wrap is input-handler's job).
-			ws_cidx="$ws_idx"
-			[[ "$ws_cidx" =~ ^[0-9]+$ ]] || ws_cidx=0
-			[ "$ws_cidx" -ge "$ws_flen" ] && ws_cidx=$((ws_flen - 1))
-			[ "$ws_cidx" -lt 0 ] && ws_cidx=0
-
-			# Build the joined tabs: current template for the highlighted index, inactive
-			# for the rest; swap __lp_tab__ -> the # escaped name (FINDING 4).
-			ws_first=1
-			ws_out=""
-			for ws_i in "${!ws_filtered[@]}"; do
-				ws_name="${ws_filtered[$ws_i]}"
-				esc_wname="${ws_name//\#/##}"   # escape # BEFORE substitution (tmux literal-#)
-				if [ "$ws_i" -eq "$ws_cidx" ]; then
-					ws_tpl="$cur_tpl"
-				else
-					ws_tpl="$reg_tpl"
-				fi
-				# literal swaps: ${var//pat/rep} does not re-scan the replacement, so a name
-				# equal to a placeholder cannot corrupt or recurse. __lp_tab__ is the sentinel
-				# WINDOW name (from #W); __lp_sentinel__ is the sentinel SESSION name (from #S /
-				# #{session_name} — Issue 5). Both map to the SAME candidate name ($esc_wname):
-				# each tab represents one candidate, whose display name is identical whether the
-				# theme used #W or #S (a #W+#S theme renders the name twice — accepted).
-				ws_seg="${ws_tpl//__lp_tab__/$esc_wname}"
-				ws_seg="${ws_seg//__lp_sentinel__/$esc_wname}"
-				if [ "$ws_first" -eq 1 ]; then
-					ws_out="$ws_seg"
-					ws_first=0
-				else
-					ws_out="$ws_out$ws_sep$ws_seg"
-				fi
-			done
-
-			# SHOW_COUNT suffix — mirror the plain path for consistency (FINDING 6).
-			if [ "$SHOW_COUNT" -eq 1 ]; then
-				ws_out="$ws_out #[fg=$FG,bg=$BG]query> $esc_wfilter [$((ws_cidx + 1))/$ws_flen]#[default]"
-			fi
-
-			printf '%s' "$ws_out"   # ONE line, NO trailing newline (multi-line #() renders last only)
-			return 0
-		fi
-		# (else: a template is empty -> fall through to the plain path below)
-	fi
+	# (§17 window-status is handled by the shared §19 engine below — the tab-style
+	#  decision picks the per-tab render strategy + separator; no separate early-return.)
 
 	LIST="$(get_state "$STATE_LIST" "")"
 	FILTER="$(get_state "$STATE_FILTER" "")"
@@ -187,6 +96,27 @@ render() {
 	[ "$cidx" -ge "$FLEN" ] && cidx=$((FLEN - 1))
 	[ "$cidx" -lt 0 ] && cidx=0
 
+	# --- §17 tab style + per-tab render strategy + inter-tab separator (shared §19 engine).
+	# plain: standalone fg/bg coloring, joined by a single space. window-status: each tab
+	# renders by swapping __lp_tab__/__lp_sentinel__ -> the # escaped name in the cached
+	# template (current vs inactive per index), joined by window-status-separator. If EITHER
+	# ws template is empty (resolution failed / not yet cached), fall back to plain (§17
+	# Fallback) so the option never breaks a setup. The §19 layout (query bar / viewport /
+	# overflow indicators / query-empty vs query-active / no-match) is IDENTICAL for both.
+	tab_style="$(opt_tab_style)"
+	cur_tpl=""; reg_tpl=""; sep=" "; sep_w=1
+	if [ "$tab_style" = "window-status" ]; then
+		cur_tpl="$(get_state "$STATE_TAB_CURRENT_TMPL" "")"
+		reg_tpl="$(get_state "$STATE_TAB_INACTIVE_TMPL" "")"
+		if [ -z "$cur_tpl" ] || [ -z "$reg_tpl" ]; then
+			tab_style="plain"   # §17 Fallback: empty/unresolvable template -> plain
+		else
+			sep="$(tmux show-options -gwv window-status-separator 2>/dev/null)"
+			[ -z "$sep" ] && sep=" "
+			sep_w="$(lp_disp_width "$sep")"
+		fi
+	fi
+
 	# --- viewport windowing + overflow indicators (PRD §19 §3.32/§3.33) ---
 	# Available tab width T = client_width − query_block − active indicators. The indicator
 	# presence depends on hidden counts (circular with the viewport); resolve via probe +
@@ -211,7 +141,7 @@ render() {
 		# The ranked list lp_viewport measures (newline-joined filtered names).
 		ranked="$(printf '%s\n' "${filtered[@]}")"
 		# Probe (no indicator reservation).
-		lp_viewport "$ranked" "$T0" "$SCROLL" "$cidx" 1
+		lp_viewport "$ranked" "$T0" "$SCROLL" "$cidx" "$sep_w"
 		th=$(( LPV_HIDDEN_LEFT + LPV_HIDDEN_RIGHT ))
 		if [ "$th" -eq 0 ]; then
 			# Fits entirely -> no indicators; lp_viewport already clamped scroll to 0.
@@ -229,7 +159,7 @@ render() {
 				right_ind="${ovr_fmt//%d/$th}"
 				ind_w=$(( $(lp_disp_width "$left_ind") + $(lp_disp_width "$right_ind") ))
 				vp_T=$(( T0 - ind_w ))
-				lp_viewport "$ranked" "$vp_T" "$SCROLL" "$cidx" 1
+				lp_viewport "$ranked" "$vp_T" "$SCROLL" "$cidx" "$sep_w"
 				new_lp=0
 				[ "$LPV_HIDDEN_LEFT" -gt 0 ] && new_lp=1
 				[ "$new_lp" = "$left_present" ] && break
@@ -255,16 +185,29 @@ render() {
 	tabs=""
 	for (( i = vis_start; i <= vis_end; i++ )); do
 		esc_name="${filtered[$i]//\#/##}"
-		if [ "$i" -eq "$cidx" ]; then
-			seg="#[fg=$HFG,bg=$HBG]${esc_name}#[default]"
+		if [ "$tab_style" = "window-status" ]; then
+			# §17: swap __lp_tab__/__lp_sentinel__ -> name in the cached template (current
+			# vs inactive per index). ${var//pat/rep} does not re-scan the replacement, so
+			# a name equal to a placeholder cannot corrupt or recurse.
+			if [ "$i" -eq "$cidx" ]; then
+				seg="${cur_tpl//__lp_tab__/$esc_name}"
+				seg="${seg//__lp_sentinel__/$esc_name}"
+			else
+				seg="${reg_tpl//__lp_tab__/$esc_name}"
+				seg="${seg//__lp_sentinel__/$esc_name}"
+			fi
 		else
-			seg="#[fg=$FG,bg=$BG]${esc_name}#[default]"
+			if [ "$i" -eq "$cidx" ]; then
+				seg="#[fg=$HFG,bg=$HBG]${esc_name}#[default]"
+			else
+				seg="#[fg=$FG,bg=$BG]${esc_name}#[default]"
+			fi
 		fi
 		if [ "$first" -eq 1 ]; then
 			tabs="$seg"
 			first=0
 		else
-			tabs="$tabs $seg"
+			tabs="$tabs$sep$seg"
 		fi
 	done
 

@@ -127,7 +127,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Renderer rework (query bar + ranked viewport + overflow; drop count)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Restructure renderer.sh render() so line 1 follows §19 for BOTH tab styles (plain and window-status). Both paths go through: query block (icon+query, only while typing) → ranked tabs sliced by @livepicker-scroll → overflow indicators. Drop the index/total count and the query> label entirely. Factor the query-bar + viewport assembly via layout.sh so the two tab-styles share one layout engine (the only difference is how a single tab renders).",
           "tasks": [
             {
@@ -194,14 +194,14 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "Window-status (§17) path §19 restructure + remove SHOW_COUNT entirely",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Rework the §17 window-status early-return path so it ALSO goes through the §19 layout (query bar + viewport + overflow) instead of bypassing it. Then remove opt_show_count, the SHOW_COUNT_RAW/SHOW_COUNT locals, and every remaining SHOW_COUNT branch (now only the ws path had them) — the index/total count is gone everywhere. Both tab-styles share the §19 layout engine; the only per-style difference is how one tab renders (cached template swap vs #[fg/bg]name).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T3.S1",
                   "title": "Rework window-status path through §19 viewport; remove opt_show_count + all SHOW_COUNT logic",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",
@@ -233,14 +233,14 @@
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Client-width capture + client-resized hook (activate + restore)",
-              "status": "Researching",
+              "status": "Ready",
               "description": "Capture the invoking client's width into @livepicker-client-width at activation, install a client-resized hook that refreshes it for the picker duration, and restore the prior hook exactly on exit. Mirror the existing session-window-changed save/restore.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Capture client_width at activate + install/restore client-resized hook",
-                  "status": "Researching",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S2"
