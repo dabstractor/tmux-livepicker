@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Theme-matched tabs (§17) & deferred preview (§18)",
-      "status": "Ready",
+      "status": "Complete",
       "description": "Deliver the two new capabilities added by PRD revision 002 as independent tracks against the already-shipped plan-001 implementation (16 tests green). Track A (§17): the picker can render its items through the theme's own window-status-current-format / window-status-format so it looks like the user's window tabs under any theme, gated by @livepicker-tab-style (plain default). Track B (§18): typing and navigation redraw the status synchronously but defer the live preview to a background, supersedeable run-shell -b job so a keystroke never waits on link-window/select-window, gated by @livepicker-preview-defer (on default). Neither feature fires client-session-changed or touches the saved-state contract; both tear down via clear_all_state. Build target: tmux 3.6b (floor 3.0).",
       "milestones": [
         {
@@ -176,7 +176,7 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Validation (§15.23 + §15.24) + changeset-level documentation",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Feature-specific tests under the existing socket-isolated harness, mirroring the new §15 subsections, then the cross-cutting Mode-B documentation sync (README config table + notes, CHANGELOG entry).",
           "tasks": [
             {
@@ -231,14 +231,14 @@
               "type": "Task",
               "id": "P1.M3.T3",
               "title": "Sync changeset-level documentation (README.md + CHANGELOG.md)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Mode-B catch-all: update README.md (add the two new options to the configuration table; add short Appearance and Performance notes) and CHANGELOG.md (an entry for both features noting defaults and that they do not change the pollution/restore invariants). Do NOT edit PRD.md (read-only).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T3.S1",
                   "title": "Update README.md config table + notes and CHANGELOG.md entry for both features",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1",

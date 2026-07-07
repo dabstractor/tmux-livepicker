@@ -101,7 +101,9 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                    |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                    |
 | `@livepicker-preview-mode`         | `live`     | `live` (link-window, all panes), `snapshot` (capture-pane, active pane), or `off`.                   |
+| `@livepicker-preview-defer`        | `on`        | Defer the live preview to a background job so typing and navigation never wait on `link-window`/`select-window`; `off` restores the synchronous path for diagnosis. |
 | `@livepicker-suppress-window-hook` | `on`       | Clear `session-window-changed` during the picker to avoid focus-resync side effects.                 |
+| `@livepicker-tab-style`            | `plain`     | `plain` (standalone `@livepicker-fg`/`bg`/`highlight-*`) or `window-status` (reuse the theme's `window-status-current-format` / `window-status-format` so picker tabs match your window tabs; falls back to `plain`). |
 | `@livepicker-fg`                   | `default`  | Picker text color.                                                                                   |
 | `@livepicker-bg`                   | `default`  | Picker background.                                                                                   |
 | `@livepicker-highlight-fg`         | `black`    | Highlighted (current) item text.                                                                     |
@@ -115,6 +117,14 @@ Set any option before the plugin loads (or set it and reload tmux):
 set -g @livepicker-type 'window'
 set -g @livepicker-highlight-bg 'magenta'
 ```
+
+### Appearance
+
+The picker can match your window-status theme. Set `@livepicker-tab-style window-status` and the picker renders its items through the theme's own `window-status-current-format` / `window-status-format`, so the tabs read as part of the status bar under any theme. The default is `plain`, which uses the standalone `@livepicker-fg` / `bg` / `highlight-*` colors. If the theme format cannot be resolved, the picker falls back to `plain`, so the option never breaks your status bar.
+
+### Performance
+
+The live preview is deferred by default. Typing and navigation redraw the status line immediately; the preview re-link runs in the background, so neither waits on `link-window` / `select-window`. Set `@livepicker-preview-defer off` to restore the synchronous preview path (useful for diagnosis).
 
 ## Usage
 
