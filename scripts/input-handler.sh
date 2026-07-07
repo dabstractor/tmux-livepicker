@@ -10,7 +10,7 @@
 # (P1.M4.T4.S1, COMPLETE) installed. Each typing key is bound as:
 #   tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh type $lp_c"
 # run-shell execs the WHOLE string via the shell (word-split on spaces), so:
-#   argv[1] = action (type | backspace | next-session | prev-session | confirm | cancel)
+#   argv[1] = action (type | backspace | next-session | prev-session | confirm | cancel | refresh-width)
 #   argv[2] = the typed char (for `type`) — verified to pass correctly for
 #             a-z A-Z 0-9 - _ . / (the `-` is the 2nd positional, NOT a flag).
 #
@@ -457,6 +457,15 @@ input_main() {
 			# FINDING 6: use $CURRENT_DIR (the house variable; == scripts/). Do NOT
 			# use $SCRIPT_DIR (undefined here -> set -u crash).
 			"$CURRENT_DIR/restore.sh" cancel
+			return 0
+			;;
+		refresh-width)
+			# PRD §10 step 5 / §3.35: the client-resized hook fires this on resize. Re-cache the
+			# invoking client's width (client-aware via lp_client_format) and force a status redraw
+			# so the §19 renderer re-windows the viewport for the new width. NO preview work, NO
+			# filter/index change (the hook is global; single-client plugin — PRD §2).
+			set_state "$STATE_CLIENT_WIDTH" "$(lp_client_format '#{client_width}')"
+			tmux refresh-client -S 2>/dev/null || true
 			return 0
 			;;
 		*)

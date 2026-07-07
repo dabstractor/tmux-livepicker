@@ -226,21 +226,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Input flow: scroll-into-view, scroll reset, client-width cache",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Wire the scroll state into the input paths and add the client-width capture + client-resized hook to activate/restore. The client-width cache is what the renderer measures the viewport against (no per-keystroke tmux round-trip).",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Client-width capture + client-resized hook (activate + restore)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Capture the invoking client's width into @livepicker-client-width at activation, install a client-resized hook that refreshes it for the picker duration, and restore the prior hook exactly on exit. Mirror the existing session-window-changed save/restore.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Capture client_width at activate + install/restore client-resized hook",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S2"
@@ -260,14 +260,14 @@
               "type": "Task",
               "id": "P1.M3.T2",
               "title": "Scroll-into-view on nav + scroll reset on type/backspace/cancel-clear",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Wire the scroll state into the input paths: next-session/prev-session run the layout.sh scroll-into-view rule after updating the index; type/backspace/cancel-clear reset scroll=0 alongside the existing index=0 reset. Scroll is part of the synchronous status update (still status-only; no preview work).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
                   "title": "Wire scroll state into input paths (scroll-into-view + reset)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S1",

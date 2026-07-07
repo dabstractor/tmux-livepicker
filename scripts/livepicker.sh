@@ -212,6 +212,23 @@ activate_main() {
 	set_state "$STATE_LIST" "$list"
 	set_state "$STATE_FILTER" ""
 	set_state "$STATE_INDEX" "$idx"
+	# --- T2b (P1.M3.T1.S1): client-width cache + client-resized hook (PRD §10 step 5 / §3.35).
+	# Capture the invoking client's width into @livepicker-client-width so the §19 renderer
+	# measures the viewport with NO per-keystroke tmux round-trip (§18 budget; width=0 ->
+	# degraded full-list render). Done AFTER T2 (window-mode token resolution needs the
+	# client) and BEFORE T3 (the renderer is installed + first-rendered here). CLIENT-AWARE
+	# via lp_client_format (H1 fix; falls back to context-free on the detached/test edge).
+	# Then save the prior client-resized hook (tmux_get_hook, verbatim incl. -b / multi-index),
+	# clear every index, and install ours -> input-handler.sh refresh-width, which re-caches
+	# the width on resize. restore.sh STEP 4 clears ours + replays the saved lines (the
+	# IDENTICAL shape as session-window-changed, §P4; the save MUST precede the clear).
+	set_state "$STATE_CLIENT_WIDTH" "$(lp_client_format '#{client_width}')"
+	tmux set-option -g "$ORIG_CLIENT_RESIZED_HOOK" "$(tmux_get_hook client-resized)"
+	tmux_clear_hook client-resized
+	# Absolute path (server cwd != plugin dir); single-quote the arg inside the double-quoted
+	# run-shell (matches the key-binding form, livepicker.sh bind-key lines). Installs as
+	# client-resized[0]; show-hooks -g always lists client-resized (bare when unset).
+	tmux set-hook -g client-resized "run-shell '$CURRENT_DIR/input-handler.sh refresh-width'"
 	# --- T3 (P1.M4.T3.S1): grow status bar + install renderer ---
 	# PRD §10 steps 2-4, in order:
 	#   (a) SHIFT every genuinely-user-set status-format index up by one,

@@ -54,7 +54,7 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd orig_layout
+	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout
 
 	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
@@ -129,7 +129,7 @@ restore_main() {
 	# keep: intentionally no else — doing nothing is the contract (FINDING D).
 
 	# --- STEP 4 (PRD §9 restore step 4): restore status / status-format /
-	#     key-table / renumber-windows / session-window-changed hook ---
+	#     key-table / renumber-windows / session-window-changed + client-resized hooks ---
 	# The matched teardown of ACTIVATE T3 (status grow) + T4.S1 (key-table switch)
 	# + T4.S2 (hook suppress) + the STEP-2 save. Goal: byte-identical to
 	# pre-activate (assertable by diffing show-options/show-hooks before vs after).
@@ -177,6 +177,26 @@ restore_main() {
 	# When @livepicker-suppress-window-hook is "off": activate did NOT clear the
 	# hook, so the live hook is still the user's original -> restore does nothing
 	# here (the if skips). Symmetric with activate T4.S2.
+	# client-resized hook (PRD §9 / §10 step 5 §3.35): the IDENTICAL shape as
+	#   session-window-changed above (§P4), with ONE difference — activate
+	#   INSTALLED ours at [0] (it didn't just suppress), so CLEAR ours FIRST;
+	#   then replay every saved client-resized[N] <cmd> line preserving index +
+	#   verbatim command. If nothing was saved (bare "client-resized" line, the
+	#   common unset case), the loop skips -> the hook stays cleared (== the
+	#   user's prior unset state) -> byte-identical to pre-activate. NOT gated
+	#   (the width cache is always installed, unlike the opt-in window-hook
+	#   suppression). Empirically proven byte-identical for unset + set priors.
+	tmux_clear_hook client-resized
+	r_cr_hook="$(get_state "$ORIG_CLIENT_RESIZED_HOOK" "")"
+	while IFS= read -r cr_line; do
+		case "$cr_line" in
+			"client-resized"|"") continue ;;   # bare name / blank -> skip
+		esac
+		cr_idx="$(printf '%s\n' "$cr_line" | sed -n 's/^client-resized\[\([0-9]\+\)\].*/\1/p')"
+		cr_cmd="${cr_line#client-resized\[*\] }"
+		[ -z "$cr_idx" ] && continue
+		tmux set-hook -g "client-resized[$cr_idx]" "$cr_cmd" 2>/dev/null || true
+	done <<< "$r_cr_hook"
 
 	# --- STEP 5 (PRD §9 restore step 5): restore the original pane layout ---
 	# select-layout applies to the ACTIVE window. STEP 2 (T1.S1) already ran
