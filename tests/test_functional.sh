@@ -188,23 +188,28 @@ test_window_confirm_lands_on_chosen_window() {
 	tmux set-option -g @livepicker-type window
 	# Give alpha a distinct second window so there is a non-default target to pick.
 	tmux new-window -t alpha -n chosenwin
+	# PRD §6: typing filters to a substring over the 'session:index' token. Typing
+	# 'alpha' matches BOTH alpha windows (alpha:<shell> and alpha:<chosenwin>), so
+	# the top match is whatever sorts first (alpha's first window). To verify the
+	# actual intent — 'confirm lands on the HIGHLIGHTED window' (PRD §6) — navigate
+	# DOWN to chosenwin before confirming, so the assertion is independent of
+	# base-index, automatic-rename, and the shell window's name (the prior test
+	# FALSE-FAILed wherever automatic-rename renamed the shell window 'zsh').
 	"$LIVEPICKER_SCRIPTS/livepicker.sh"
-	# Filter down to alpha's windows.
 	local c
 	for c in a l p h a; do
 		"$LIVEPICKER_SCRIPTS/input-handler.sh" type "$c"
 	done
+	# chosenwin is alpha's SECOND window -> after filtering to the alpha matches it
+	# sits at filtered-index 1 (the list is list-windows -a order: alpha:<first>,
+	# alpha:<second>). One next-session moves the highlight onto it.
+	"$LIVEPICKER_SCRIPTS/input-handler.sh" next-session
 	"$LIVEPICKER_SCRIPTS/input-handler.sh" confirm
-	# The client must have switched to alpha AND land on a window there.
+	# The client must have switched to alpha AND landed on chosenwin specifically.
 	assert_eq "$(tmux display-message -p '#{session_name}')" "alpha" \
 		"window-mode confirm switched the client to the target session (alpha)"
-	# The chosen window was the highlighted one in alpha; confirm should land on it
-	# (not the original driver window). Assert we are on a window named chosenwin
-	# OR at minimum inside alpha (window-level landing).
-	case "$(tmux display-message -p '#{window_name}')" in
-		chosenwin|extra|alpha) pass "window-mode confirm landed on an alpha window" ;;
-		*) fail "window-mode confirm did not land on an alpha window (got window: $(tmux display-message -p '#{window_name}'))" ;;
-	esac
+	assert_eq "$(tmux display-message -p '#{window_name}')" "chosenwin" \
+		"window-mode confirm landed on the chosen (highlighted) window, not the shell window"
 }
 
 # test_preview_follows_type_filter — Bugfix Issue 2: typing a filter must sync the

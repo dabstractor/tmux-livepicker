@@ -56,19 +56,24 @@ preview_fallback() {
 	# capture-pane snapshot fallback (PRD §7 Fallbacks). Single-pane, NOT live.
 	# Invoked (a) when @livepicker-preview-mode == snapshot (always), and
 	# (b) when a live link-window fails (degraded but non-blocking path).
-	# Captures the candidate's active pane with escapes. CRITICAL: the target is
-	# "=$target:." where $target is the session name (session mode) OR the parsed
-	# "session:index" (window mode). The bare "=$1:." form is MALFORMED in window
-	# mode: $1="multi:1" -> "=multi:1:." -> "can't find window 1:". So in window
-	# mode parse the token and build "=$w_sess:$w_idx." (the active pane of the
-	# specific window). Returns capture's rc: 0 = captured, non-zero = gone.
-	local captured target="$1"
+	# Captures the candidate's active pane with escapes. The target is a
+	# "=<sess>:<win>." pane spec (the trailing '.' = active pane): SESSION mode
+	# uses "=$S:." (= active window's active pane); WINDOW mode ($S is a
+	# "session:index" token) uses "=$w_sess:$w_idx." (the active pane of THAT
+	# window). Do NOT build "=$w_sess:$w_idx:." — the extra ':' makes tmux parse
+	# the index as "1:" and fail with "can't find window 1:". Returns capture's
+	# rc: 0 = captured, non-zero = gone.
+	local captured target
 	if [ "$(opt_type)" = "window" ] && [ "${1%%:*}" != "$1" ]; then
-		local w_sess="${1%%:*}" w_idx="${1#*:}"
-		target="$w_sess:$w_idx"
+		# WINDOW mode: candidate token is "session:window_index" (livepicker.sh).
+		# Build "session:index." — the '.' attaches directly to the index (NO ':').
+		target="=${1%%:*}:${1#*:}."
+	else
+		# SESSION mode: "=session:." = active window's active pane.
+		target="=$1:."
 	fi
 	# shellcheck disable=SC2034  # best-effort hint; text intentionally unused.
-	captured="$(tmux capture-pane -ep -t "=$target:." 2>/dev/null)" && return 0 || return 1
+	captured="$(tmux capture-pane -ep -t "$target" 2>/dev/null)" && return 0 || return 1
 }
 
 # argv[1] = candidate session name S.
