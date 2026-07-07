@@ -134,14 +134,14 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Plain render path §19 restructure (query-empty / query-active / no-match)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Restructure the plain (non-window-status) render path in render() to follow §19: query-empty shows only tabs justified per status-justify (no icon/query/gap/count); query-active shows icon+query+gap+tabs at column 0; no-match shows icon+query+(no match). Drop the SHOW_COUNT branch from the plain path. Use lp_rank (ranked order) and lp_disp_width (from layout.sh).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Restructure render() plain path into §19 layout; drop plain SHOW_COUNT branch",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S2",
@@ -166,14 +166,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Viewport windowing + overflow indicators (plain path)",
-              "status": "Researching",
+              "status": "Ready",
               "description": "Window the ranked list by @livepicker-scroll to width T (via layout.sh lp_viewport) and render the overflow indicators: right +N> (%d = TOTAL hidden, left+right combined) and left < (presence only, when scroll>0). Both can show at once (< …tabs… +N>); neither when all fit. Apply to the plain query-active and query-empty paths.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Window ranked list by scroll + render overflow indicators",
-                  "status": "Researching",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",

@@ -43,13 +43,15 @@ source "$CURRENT_DIR/utils.sh"
 source "$CURRENT_DIR/state.sh"
 # shellcheck source=rank.sh
 source "$CURRENT_DIR/rank.sh"
+# shellcheck source=layout.sh
+source "$CURRENT_DIR/layout.sh"
 
 render() {
 	local TYPE FG BG HFG HBG SHOW_COUNT_RAW SHOW_COUNT
 	local LIST FILTER IDX
 	local -a all=() filtered=()
 	local TOTAL FLEN
-	local out seg i cidx first esc_filter esc_name
+	local out seg i cidx first esc_filter esc_name SCROLL icon gap tabs justify width pad padw tabs_w
 
 	TYPE="$(opt_type)"
 	FG="$(opt_fg)"
@@ -154,52 +156,82 @@ render() {
 
 	LIST="$(get_state "$STATE_LIST" "")"
 	FILTER="$(get_state "$STATE_FILTER" "")"
-	esc_filter="${FILTER//\#/##}"   # display escape: every # -> ## (tmux literal-#; Issue 3)
+	esc_filter="${FILTER//\#/##}"   # display escape: every # -> ## (tmux literal-#; §P6)
 	IDX="$(get_state "$STATE_INDEX" "0")"
+	SCROLL="$(get_state "$STATE_SCROLL" "0")"   # read; viewport slicing lands in P1.M2.T2
 
 	mapfile -t all < <(printf '%s' "$LIST")
 	TOTAL="${#all[@]}"
-
 	mapfile -t filtered < <(lp_rank "$LIST" "$FILTER")
 	FLEN="${#filtered[@]}"
 
-	out=""
+	# icon: the search glyph (U+F002) iff nerd-fonts on; else empty (raw UTF-8 bytes either way).
+	if [ "$(opt_nerd_fonts)" = "on" ]; then
+		icon="$(opt_search_icon)"
+	else
+		icon=""
+	fi
+	# gap: exactly opt_query_gap PLAIN (unstyled) spaces between the query and the tabs.
+	[[ "$(opt_query_gap)" =~ ^[0-9]+$ ]] && gap="$(printf '%*s' "$(opt_query_gap)" '')" || gap=""
+
+	# --- (c) NO-MATCH (PRD §19 §3.34): <icon><query> (no match). Plain-ASCII marker. ---
 	if [ "$FLEN" -eq 0 ]; then
-		if [ "$SHOW_COUNT" -eq 1 ]; then
-			out="#[fg=$FG,bg=$BG]query> $esc_filter (no match) 0/$TOTAL#[default]"
-		else
-			out="#[fg=$FG,bg=$BG]query> $esc_filter (no match)#[default]"
-		fi
-		printf '%s' "$out"
+		printf '%s' "#[fg=$FG,bg=$BG]${icon}${esc_filter} (no match)#[default]"
 		return 0
 	fi
 
+	# clamp cidx (0-based; wrap is the input-handler's job).
 	cidx="$IDX"
 	[[ "$cidx" =~ ^[0-9]+$ ]] || cidx=0
 	[ "$cidx" -ge "$FLEN" ] && cidx=$((FLEN - 1))
 	[ "$cidx" -lt 0 ] && cidx=0
 
+	# Build the tab segments (shared by query-empty + query-active): each name # escaped,
+	# styled; the highlighted index uses HFG/HBG; joined by a single space (plain mode).
 	first=1
+	tabs=""
 	for i in "${!filtered[@]}"; do
-		esc_name="${filtered[$i]//\#/##}"   # display escape: every # -> ## (tmux literal-#; Issue 3)
+		esc_name="${filtered[$i]//\#/##}"   # display escape: every # -> ## (tmux literal-#; §P6)
 		if [ "$i" -eq "$cidx" ]; then
 			seg="#[fg=$HFG,bg=$HBG]${esc_name}#[default]"
 		else
 			seg="#[fg=$FG,bg=$BG]${esc_name}#[default]"
 		fi
 		if [ "$first" -eq 1 ]; then
-			out="$seg"
+			tabs="$seg"
 			first=0
 		else
-			out="$out $seg"
+			tabs="$tabs $seg"
 		fi
 	done
 
-	if [ "$SHOW_COUNT" -eq 1 ]; then
-		out="$out #[fg=$FG,bg=$BG]query> $esc_filter [$((cidx + 1))/$FLEN]#[default]"
+	if [ -z "$FILTER" ]; then
+		# --- (a) QUERY EMPTY (PRD §19 §3.30): ONLY the tabs, positioned per status-justify.
+		# No icon/query/gap/count. tmux does NOT justify #() output, so the renderer EMULATES
+		# it with leading padding spaces (§P6). status-justify is ONE read per redraw (allowed).
+		justify="$(tmux show-options -g -v status-justify 2>/dev/null)"
+		[ -z "$justify" ] && justify=left
+		width="$(get_state "$STATE_CLIENT_WIDTH" "0")"
+		[[ "$width" =~ ^[0-9]+$ ]] || width=0
+		pad=""
+		if [ "$justify" != left ] && [ "$width" -gt 0 ]; then
+			tabs_w="$(lp_disp_width "$tabs")"   # strip #[...] styles, count codepoints
+			if [ "$tabs_w" -lt "$width" ]; then
+				case "$justify" in
+					centre | absolute-centre) padw=$(( (width - tabs_w) / 2 )) ;;
+					right) padw=$(( width - tabs_w )) ;;
+					*) padw=0 ;;
+				esac
+				[ "$padw" -gt 0 ] && pad="$(printf '%*s' "$padw" '')"
+			fi
+		fi
+		printf '%s' "${pad}${tabs}"
+		return 0
 	fi
 
-	printf '%s' "$out"
+	# --- (b) QUERY ACTIVE (PRD §19 §3.31): <icon><query><gap><tabs> at column 0.
+	# status-justify is SUSPENDED (pinned-left). Query is # escaped; gap is plain spaces.
+	printf '%s' "#[fg=$FG,bg=$BG]${icon}${esc_filter}#[default]${gap}${tabs}"
 }
 
 render || printf '%s' '#[fg=red]livepicker: renderer error#[default]'

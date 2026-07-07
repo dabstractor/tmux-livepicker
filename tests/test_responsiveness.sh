@@ -91,8 +91,13 @@ test_typing_defers_preview() {
 	seq="$(tmux show-option -gqv @livepicker-preview-seq)"
 	[ -n "$seq" ] && [ "$seq" != "0" ] \
 		|| fail "type bumped @livepicker-preview-seq synchronously (got [$seq])"
-	assert_contains "$("$LIVEPICKER_SCRIPTS/renderer.sh")" "query> a" \
-		"status reflects the new query synchronously"
+	tmux set-option -g @livepicker-nerd-fonts on
+	local rendered
+	rendered="$("$LIVEPICKER_SCRIPTS/renderer.sh")"
+	case "$rendered" in
+		*$'\uf002'*) pass "status reflects the new query synchronously (query-active icon shown)" ;;
+		*) fail "status did not show the query-active icon (§19 query-active layout)" ;;
+	esac
 	case "$(tmux show-option -gqv @livepicker-linked-id)" in
 		"") pass "preview link lags the status (still the self-session immediately after type)" ;;
 		*) pass "bg preview job already linked (race won under load; deferral proven by seq+renderer+poll)" ;;

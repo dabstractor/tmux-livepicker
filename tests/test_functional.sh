@@ -329,12 +329,12 @@ test_renderer_escapes_hash_in_filter() {
 	tmux set-option -g "@livepicker-index" "0"
 	local out
 	out="$("$LIVEPICKER_SCRIPTS/renderer.sh")"
-	assert_contains "$out" "query> ##dev" \
-		"renderer escaped # -> ## in the query (match branch, count suffix)"
+	assert_contains "$out" "##dev" \
+		"renderer escaped # -> ## in the query+tab (§19 query-active; query> prefix gone)"
 	# --- no-match branch: filter `#zz` matches nothing ---
 	tmux set-option -g "@livepicker-filter" "#zz"
 	out="$("$LIVEPICKER_SCRIPTS/renderer.sh")"
-	assert_contains "$out" "query> ##zz" \
-		"renderer escaped # -> ## in the query (no-match branch)"
+	assert_contains "$out" "##zz" \
+		"renderer escaped # -> ## in the query (§19 no-match; no tabs -> query-only proof)"
 	assert_contains "$out" "(no match)" "no-match branch rendered the (no match) line"
 }
