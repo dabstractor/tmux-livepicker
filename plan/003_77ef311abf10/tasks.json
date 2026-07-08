@@ -389,7 +389,7 @@
           "type": "Milestone",
           "id": "P2.M1",
           "title": "session-mgmt.sh + bindings + input dispatch + options",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Add the rename/delete options and activate binding step 5 (both control keys, non-alphanumeric, so they never collide with the typing set), then implement scripts/session-mgmt.sh (rename via command-prompt + do-rename; delete with guards + unlink-first + kill-session + re-sync) and the input-handler rename/delete dispatch.",
           "tasks": [
             {
@@ -421,7 +421,7 @@
               "type": "Task",
               "id": "P2.M1.T2",
               "title": "session-mgmt.sh rename + delete + input dispatch",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Add `rename` and `delete` actions to input-handler.sh input_main() that delegate to scripts/session-mgmt.sh. Implement rename (command-prompt pre-filled + do-rename with sanitized/collision guards) and delete (driver/last-session guards + optional confirm + unlink-first-then-kill-session + re-rank + re-sync). Both resolve the highlighted item via lp_rank + @livepicker-index exactly as confirm/nav do.",
               "subtasks": [
                 {
@@ -446,7 +446,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T2.S2",
                   "title": "Implement delete (guards + unlink-first + kill-session + re-sync) + input dispatch",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T2.S1"

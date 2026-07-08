@@ -509,7 +509,15 @@ input_main() {
 			"$CURRENT_DIR/session-mgmt.sh" rename
 			return 0
 			;;
-		# --- P2.M1.T2.S2 seam: `delete)` -> "$CURRENT_DIR/session-mgmt.sh" delete. ---
+		# --- P2.M1.T2.S2: delete the highlighted session/window (PRD §21 §3.43).
+		#     Thin delegate — session-mgmt.sh hosts the guards + optional
+		#     confirm-before + do-delete (unlink-first + kill + rewrite + clamp
+		#     + re-rank + re-sync). MUST NOT reference $2 (the M-BSpace binding
+		#     passes no char; mirror rename). The picker STAYS OPEN. ---
+		delete)
+			"$CURRENT_DIR/session-mgmt.sh" delete
+			return 0
+			;;
 		refresh-width)
 			# PRD §10 step 5 / §3.35: the client-resized hook fires this on resize. Re-cache the
 			# invoking client's width (client-aware via lp_client_format) and force a status redraw

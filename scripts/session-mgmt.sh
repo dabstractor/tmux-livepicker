@@ -216,10 +216,183 @@ session_mgmt_do_rename() {
 	return 0
 }
 
+# session_mgmt_delete — the `delete)` action (PRD §21 §3.43). Resolve the
+# highlighted session/window, apply the guards (refuse with a message + NO
+# kill), then either confirm-before (if opt_confirm_delete on) or call do-delete
+# directly. The picker STAYS OPEN (no restore). MUST NOT reference $2 (the
+# M-BSpace binding passes no char; mirror rename/confirm).
+session_mgmt_delete() {
+	local _target _pick_type _orig _t_sess _list
+	_target="$(_lp_resolve_highlighted)"
+	[ -z "$_target" ] && return 0   # ranked empty -> no-op (PRD §21 §3.43 step 1)
+	_pick_type="$(opt_type)"
+	_orig="$(get_state "$ORIG_SESSION" "")"
+	# Guard A: refuse the DRIVER (killing it detaches the client). Session mode:
+	# _target is the name; window mode: _target is "session:window_index" -> session part.
+	if [ "$_pick_type" = "window" ]; then _t_sess="${_target%%:*}"; else _t_sess="$_target"; fi
+	if [ -n "$_orig" ] && [ "$_t_sess" = "$_orig" ]; then
+		tmux display-message "livepicker: cannot delete the driver session"
+		return 0
+	fi
+	# Guard B: refuse when deleting would strand the client / kill the server.
+	if [ "$_pick_type" = "window" ]; then
+		# Window mode: refuse the driver's ONLY window (FINDING 8).
+		if [ -n "$_orig" ]; then
+			local _drv_wins
+			_drv_wins="$(tmux list-windows -t "=$_orig" 2>/dev/null | wc -l)"
+			if [ "$_drv_wins" -le 1 ] && [ "$_t_sess" = "$_orig" ]; then
+				tmux display-message "livepicker: cannot delete the driver's only window"
+				return 0
+			fi
+		fi
+	else
+		# Session mode: raw list must have >=2 entries (FINDING 2: killing the
+		# last session kills the server). mapfile makes "" a truly empty array.
+		local -a _l=()
+		_list="$(get_state "$STATE_LIST" "")"
+		mapfile -t _l < <(printf '%s' "$_list")
+		if [ "${#_l[@]}" -le 1 ]; then
+			tmux display-message "livepicker: cannot delete the last session"
+			return 0
+		fi
+	fi
+	# confirm-before (optional; PRD §21 §3.43 step 3; FINDING 5). $S is resolved
+	# here (NOT %%). On 'y' it fires do-delete $S as its own run-shell; on n/Esc
+	# nothing runs. While open it suspends the livepicker table; picker stays open.
+	if [ "$(opt_confirm_delete)" = "on" ]; then
+		if [ "$_pick_type" = "window" ]; then
+			tmux confirm-before -p "Kill window $_target? (y/n)" \
+				"run-shell '$CURRENT_DIR/session-mgmt.sh do-delete $_target'"
+		else
+			tmux confirm-before -p "Kill session $_target? (y/n)" \
+				"run-shell '$CURRENT_DIR/session-mgmt.sh do-delete $_target'"
+		fi
+		return 0
+	fi
+	# No confirm: call do-delete directly (pass S as the arg).
+	session_mgmt_do_delete "$_target"
+	return 0
+}
+
+# session_mgmt_do_delete S — the destructive half (PRD §21 §3.43 step 4).
+# argv[1] = S (session name OR "session:window_index") — S is forwarded by
+# session_mgmt_main as this function's $1 (mirror do_rename's $1=NEW). Session
+# mode: unlink the preview FIRST if it belongs to S (prevents the orphan leak,
+# FINDING 3), then kill-session. Window mode: kill-window (destroys the shared
+# window -> no orphan, FINDING 8). Then rewrite STATE_LIST, clamp the index onto
+# a neighbour, re-rank, re-sync the preview to the new highlight, refresh. Runs
+# as its own process (from session_mgmt_delete, OR standalone from confirm-before).
+session_mgmt_do_delete() {
+	local _S="${1:-}"
+	[ -z "$_S" ] && return 0
+	local _pick_type _orig _linked _list _new_list
+	_pick_type="$(opt_type)"
+	_orig="$(get_state "$ORIG_SESSION" "")"
+	_linked="$(get_state "$STATE_LINKED_ID" "")"
+	_list="$(get_state "$STATE_LIST" "")"
+
+	# DEFENSIVE re-check of the catastrophic length-<=1 guard (FINDING 2). The
+	# confirm-delete path has a time gap; a raced external kill could make S the
+	# last session -> killing it shuts the server down. S==ORIG_SESSION is stable
+	# across the gap, so only the length guard is re-checked (session mode).
+	if [ "$_pick_type" != "window" ]; then
+		local -a _l=()
+		mapfile -t _l < <(printf '%s' "$_list")
+		if [ "${#_l[@]}" -le 1 ]; then
+			tmux display-message "livepicker: cannot delete the last session"
+			return 0
+		fi
+	fi
+
+	if [ "$_pick_type" = "window" ]; then
+		# ===== WINDOW MODE (FINDING 8) =====
+		# kill-window destroys the window OBJECT in every session -> the driver's
+		# link dies with it -> NO orphan leak, NO unlink-first. Re-guard the
+		# driver's-only-window (the confirm gap could race).
+		if [ -n "$_orig" ]; then
+			local _drv_wins
+			_drv_wins="$(tmux list-windows -t "=$_orig" 2>/dev/null | wc -l)"
+			if [ "$_drv_wins" -le 1 ] && [ "${_S%%:*}" = "$_orig" ]; then
+				tmux display-message "livepicker: cannot delete the driver's only window"
+				return 0
+			fi
+		fi
+		tmux kill-window -t "$_S" 2>/dev/null || true
+		# REBUILD the list: renumber-windows is ON -> killing window i shifts later
+		# indices -> surviving tokens are stale. Re-derive exactly as activate does
+		# (livepicker.sh:192). The killed window is simply absent.
+		_new_list="$(tmux list-windows -a -F '#{session_name}:#{window_index}' 2>/dev/null)"
+	else
+		# ===== SESSION MODE (FINDINGS 3, 4, 9) =====
+		# Unlink the linked preview from the driver FIRST when it belongs to S,
+		# else kill-session leaves it as a permanent orphan (FINDING 3). Ownership
+		# test (FINDING 4): the linked id is one of S's windows.
+		if [ -n "$_linked" ] && [ -n "$_orig" ] && [ -n "$_S" ]; then
+			if tmux list-windows -t "=$_S" -F '#{window_id}' 2>/dev/null | grep -Fxq "$_linked"; then
+				# unlink ONE link (the driver's); source keeps it; kill below destroys it.
+				tmux unlink-window -t "$_orig:$_linked" 2>/dev/null || true
+			fi
+		fi
+		tmux kill-session -t "=$_S" 2>/dev/null || true
+		# DROP S from the raw list (sessions do not renumber; in-place line edit,
+		# matches the rename sibling; preserves order; one unique match). NOTE: do
+		# NOT clear STATE_LINKED_ID — preview.sh's re-link (below) unlinks the now-
+		# dead id (rc swallowed) and overwrites it (FINDING 6).
+		local -a _lines=()
+		local _i _x _first
+		mapfile -t _lines < <(printf '%s' "$_list")
+		for _i in "${!_lines[@]}"; do
+			[ "${_lines[$_i]}" = "$_S" ] && unset '_lines[_i]'
+		done
+		_new_list=""; _first=1
+		for _x in "${_lines[@]}"; do   # "${arr[@]}" skips the unset index
+			if [ "$_first" = 1 ]; then _new_list="$_x"; _first=0
+			else _new_list="$_new_list"$'\n'"$_x"; fi
+		done
+	fi
+
+	set_state "$STATE_LIST" "$_new_list"
+
+	# ===== SHARED re-sync tail (FINDINGS 6, 7) =====
+	# Re-rank the new list (the SAME function the renderer uses), clamp the index
+	# onto a valid neighbour, re-sync the preview to the new highlight, refresh.
+	# do-delete is its own process -> invoke preview.sh DIRECTLY (single-arg
+	# synchronous form; honors defer ORDERING but not the async -b launcher).
+	local _filt _new_L _idx _new_target
+	local -a _filtered=()
+	_filt="$(get_state "$STATE_FILTER" "")"
+	mapfile -t _filtered < <(lp_rank "$_new_list" "$_filt")
+	_new_L="${#_filtered[@]}"
+	_idx="$(get_state "$STATE_INDEX" "0")"
+	[[ "$_idx" =~ ^[0-9]+$ ]] || _idx=0
+	if [ "$_new_L" -gt 0 ]; then
+		[ "$_idx" -ge "$_new_L" ] && _idx=$(( _new_L - 1 ))   # clamp to a neighbour
+		set_state "$STATE_INDEX" "$_idx"
+		_new_target="${_filtered[$_idx]}"
+	else
+		set_state "$STATE_INDEX" "0"
+		_new_target=""   # no match -> no preview re-link (mirror _lp_preview_follow)
+	fi
+	# Re-sync the preview + redraw (§P5). Empty target -> just refresh.
+	if [ -n "$_new_target" ]; then
+		if [ "$(opt_preview_defer)" = "on" ]; then
+			tmux refresh-client -S 2>/dev/null || true
+			"$CURRENT_DIR/preview.sh" "$_new_target" 2>/dev/null || true
+		else
+			"$CURRENT_DIR/preview.sh" "$_new_target" 2>/dev/null || true
+			tmux refresh-client -S 2>/dev/null || true
+		fi
+	else
+		tmux refresh-client -S 2>/dev/null || true
+	fi
+	return 0
+}
+
 # session_mgmt_main — dispatch on argv[1]. `rename` opens the prompt;
-# `do-rename` applies the rename (argv[2] = the new name). The `delete`/
-# `do-delete` branches are P2.M1.T2.S2's scope (seam comment only — do NOT
-# implement here). Unknown action -> defensive no-op (never crash the picker).
+# `do-rename` applies the rename (argv[2] = the new name). `delete` resolves +
+# guards (+ optional confirm-before); `do-delete` (argv[2] = S) unlinks-first +
+# kills + rewrites + clamps + re-ranks + re-syncs. Unknown action -> defensive
+# no-op (never crash the picker).
 session_mgmt_main() {
 	local _action="${1:-}"
 	case "$_action" in
@@ -229,8 +402,12 @@ session_mgmt_main() {
 		do-rename)
 			session_mgmt_do_rename "${2:-}"
 			;;
-		# --- P2.M1.T2.S2 seam: delete / do-delete (guards + unlink-first +
-		#     kill-session + re-sync). Add `delete)` + `do-delete)` branches here. ---
+		delete)
+			session_mgmt_delete
+			;;
+		do-delete)
+			session_mgmt_do_delete "${2:-}"
+			;;
 		*)
 			return 0   # unknown action -> defensive no-op
 			;;
