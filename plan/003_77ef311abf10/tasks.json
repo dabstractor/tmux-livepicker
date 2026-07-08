@@ -324,14 +324,14 @@
               "type": "Task",
               "id": "P1.M4.T2",
               "title": "test_ranking.sh — fuzzy ranking integration suite",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Assert the §20 ranking: query 'log' → logs-prod outranks blog-engine (prefix > deep subsequence); a non-subsequence name is hidden; empty query preserves tmux order (no reordering); renderer/nav/confirm all agree on ranked[index] (no drift). Assert performance is within the §18 budget for N up to a few hundred.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T2.S1",
                   "title": "Create test_ranking.sh (prefix>subsequence, hidden, empty order, no-drift, perf)",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"
