@@ -34,6 +34,9 @@ opt_nav_prev_keys()        { get_opt "@livepicker-nav-prev-keys" "Up"; }      # 
 opt_confirm_keys()         { get_opt "@livepicker-confirm-keys" "Enter"; }    # space-list
 opt_cancel_keys()          { get_opt "@livepicker-cancel-keys" "Escape"; }    # space-list (clear query, else cancel)
 opt_backspace_keys()       { get_opt "@livepicker-backspace-keys" "BSpace"; } # space-list
+opt_rename_key()       { get_opt "@livepicker-rename-key" "C-r"; }        # single key (rename via tmux prompt; PRD §21; mirrors sessionx @sessionx-bind-rename-session)
+opt_delete_key()       { get_opt "@livepicker-delete-key" "M-BSpace"; }   # single key (kill session; PRD §21; mirrors sessionx @sessionx-bind-kill-session)
+opt_confirm_delete()   { get_opt "@livepicker-confirm-delete" "off"; }    # bool on/off (confirm-before kill; off=sessionx-style immediate)
 opt_preview_mode()         { get_opt "@livepicker-preview-mode" "live"; }     # enum: live|snapshot|off
 opt_suppress_window_hook() { get_opt "@livepicker-suppress-window-hook" "on"; } # bool on/off
 opt_fg()                   { get_opt "@livepicker-fg" "default"; }            # tmux color

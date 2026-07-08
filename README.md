@@ -103,6 +103,9 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                   |
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                    |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                    |
+| `@livepicker-rename-key`           | `C-r`      | Rename the highlighted session via tmux's prompt. Control key; never collides with typing.           |
+| `@livepicker-delete-key`           | `M-BSpace` | Delete (kill) the highlighted session. Matches sessionx's `@sessionx-bind-kill-session`.             |
+| `@livepicker-confirm-delete`       | `off`      | When `on`, prompt `y/n` before killing a session (`confirm-before`). Default `off` = immediate, sessionx-style. |
 | `@livepicker-preview-mode`         | `live`     | `live` (link-window, all panes), `snapshot` (capture-pane, active pane), or `off`.                   |
 | `@livepicker-preview-defer`        | `on`        | Defer the live preview to a background job so typing and navigation never wait on `link-window`/`select-window`; `off` restores the synchronous path for diagnosis. |
 | `@livepicker-suppress-window-hook` | `on`       | Clear `session-window-changed` during the picker to avoid focus-resync side effects.                 |
@@ -153,6 +156,14 @@ The live preview is deferred by default. Typing and navigation redraw the status
    to it.
 5. **Cancel** — `Escape` clears the query if non-empty, otherwise cancels and
    restores your status line, key table, and focus exactly.
+6. **Rename / delete** — `C-r` (`@livepicker-rename-key`) renames the
+   highlighted session via tmux's prompt; `M-BSpace`
+   (`@livepicker-delete-key`) kills it. Deleting is refused for the driver
+   session you launched the picker from and for the last remaining session.
+   Set `@livepicker-confirm-delete on` to require a `y/n` prompt before a
+   kill. Note: a few older terminals or SSH/mosh links strip Alt-modified
+   keys; if `M-BSpace` does not fire, rebind `@livepicker-delete-key` to
+   `C-h` or `DC` (Delete).
 
 While the picker is active, the key table is fully modal: keys not explicitly
 bound to a picker action (typing, navigation, confirm, cancel) or carried over

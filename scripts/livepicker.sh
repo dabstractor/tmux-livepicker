@@ -373,6 +373,15 @@ activate_main() {
 		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh prev-session"
 	done
 
+	# --- P2.M1.T1.S1: session-mgmt keys (rename + delete), PRD §21 step 5. ---
+	# SINGLE keys (not space-lists -> no loop). Bound AFTER the typing + nav
+	# blocks so they OVERRIDE any same-key copy (C-r / M-BSpace are distinct
+	# tmux keys from r / BSpace, so typing is unaffected -- PRD §8/§16). INERT
+	# until P2.M1.T2 adds the rename)/delete) dispatch in input-handler.sh (the
+	# default * branch is a no-op return 0 -> picker stays open).
+	tmux bind-key -T livepicker "$(opt_rename_key)" run-shell "$CURRENT_DIR/input-handler.sh rename"
+	tmux bind-key -T livepicker "$(opt_delete_key)" run-shell "$CURRENT_DIR/input-handler.sh delete"
+
 	# (3) SWITCH the active key-table to livepicker (global; FINDING 3: -g is
 	# mandatory and the standalone `key-table` cmd does not exist on 3.6b).
 	tmux set-option -g key-table livepicker
