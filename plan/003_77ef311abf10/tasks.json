@@ -382,14 +382,14 @@
       "type": "Phase",
       "id": "P2",
       "title": "Session management: rename / delete (PRD §21)",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Depends on P1: rename/delete resolve the highlighted item via lp_rank + @livepicker-index, and re-rank after the mutation. Adds scripts/session-mgmt.sh, three options (rename-key, delete-key, confirm-delete), two key bindings (activate step 5), and two input-handler actions (rename, delete). Session-CRUD parity with tmux-sessionx so livepicker can replace it.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P2.M1",
           "title": "session-mgmt.sh + bindings + input dispatch + options",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Add the rename/delete options and activate binding step 5 (both control keys, non-alphanumeric, so they never collide with the typing set), then implement scripts/session-mgmt.sh (rename via command-prompt + do-rename; delete with guards + unlink-first + kill-session + re-sync) and the input-handler rename/delete dispatch.",
           "tasks": [
             {
@@ -421,14 +421,14 @@
               "type": "Task",
               "id": "P2.M1.T2",
               "title": "session-mgmt.sh rename + delete + input dispatch",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add `rename` and `delete` actions to input-handler.sh input_main() that delegate to scripts/session-mgmt.sh. Implement rename (command-prompt pre-filled + do-rename with sanitized/collision guards) and delete (driver/last-session guards + optional confirm + unlink-first-then-kill-session + re-rank + re-sync). Both resolve the highlighted item via lp_rank + @livepicker-index exactly as confirm/nav do.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M1.T2.S1",
                   "title": "Implement rename (command-prompt + do-rename) + input dispatch",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S1",
@@ -446,7 +446,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T2.S2",
                   "title": "Implement delete (guards + unlink-first + kill-session + re-sync) + input dispatch",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T2.S1"
@@ -469,21 +469,21 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Validation",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Integration test suite for rename/delete under the isolated socket.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "test_session_mgmt.sh — rename/delete integration suite",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Assert: rename opens the prompt pre-filled, a new name updates the tab in place, keeps the highlight, picker stays open; sanitized/collision names abort with a message and no rename; delete kills and removes the highlighted session, a neighbour is highlighted+previewed; driver and last session refuse with a message and no kill; deleting the currently-previewed session unlinks the preview window first (no orphan leak); confirm-delete on prompts y/n.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Create test_session_mgmt.sh (rename, sanitized/collision, delete, guards, leak, confirm)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T2.S2"

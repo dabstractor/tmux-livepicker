@@ -497,6 +497,19 @@ input_main() {
 			"$CURRENT_DIR/restore.sh" cancel
 			return 0
 			;;
+		# --- P2.M1.T2.S1: rename the highlighted session/window via tmux's
+		#     prompt (PRD §21.42). Thin delegate — session-mgmt.sh hosts the
+		#     resolution + command-prompt (rename) + apply/detect/rewrite
+		#     (do-rename). While command-prompt is open the livepicker table is
+		#     suspended (the prompt captures input); tmux restores it on
+		#     submit/escape -> no extra binding work. The picker stays OPEN
+		#     (no restore). MUST NOT reference $2 (the C-r binding passes no char;
+		#     mirror confirm FINDING 9).
+		rename)
+			"$CURRENT_DIR/session-mgmt.sh" rename
+			return 0
+			;;
+		# --- P2.M1.T2.S2 seam: `delete)` -> "$CURRENT_DIR/session-mgmt.sh" delete. ---
 		refresh-width)
 			# PRD §10 step 5 / §3.35: the client-resized hook fires this on resize. Re-cache the
 			# invoking client's width (client-aware via lp_client_format) and force a status redraw
