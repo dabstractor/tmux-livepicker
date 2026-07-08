@@ -291,7 +291,7 @@
           "type": "Milestone",
           "id": "P1.M4",
           "title": "Validation (§15.28 layout / ranking / scroll)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "New/updated integration test suites under the existing socket-isolated harness, mirroring the new §15.28 checklist. Renderer tests need no client (seed state → run renderer.sh → assert_contains); nav/scroll tests need attach_test_client.",
           "tasks": [
             {
@@ -350,14 +350,14 @@
               "type": "Task",
               "id": "P1.M4.T3",
               "title": "Scroll-into-view + client-width cache tests",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Assert: nav past the right edge scrolls the highlight into view and shows <; resizing the client updates @livepicker-client-width via the client-resized hook and the next redraw recomputes the viewport; after exit the prior client-resized hook is restored exactly; type/backspace/cancel-clear reset scroll to 0.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T3.S1",
                   "title": "Create scroll + client-width cache tests",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M3.T2.S1",
@@ -396,14 +396,14 @@
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Options + key bindings (activate step 5)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add opt_rename_key (C-r), opt_delete_key (M-BSpace), opt_confirm_delete (off) to options.sh. In livepicker.sh activate T4, after the nav bindings (step 4), add step 5: bind rename-key → input-handler.sh rename, delete-key → input-handler.sh delete. Both are control keys (distinct tmux keys from the letters r/backspace), so they override any copied same-key binding without colliding with the typing set.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M1.T1.S1",
                   "title": "Add rename/delete/confirm-delete options + activate binding step 5",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: options.sh one-liner pattern (codebase_patterns.md §P2). livepicker.sh activate T4 binds keys in order (copy → typing → backspace/confirm/cancel → nav); the load-bearing rule (PRD §8 §3.18): tmux keeps the LAST binding for a key in a table, and steps 4/5 run AFTER step 2 (typing), so a nav/mgmt key OVERRIDES a typing binding for the same key — which is why mgmt keys must be non-alphanumeric (C-r and M-BSpace are distinct tmux keys from the letters r and BSpace). The binding is INERT until P2.M1.T2 implements the dispatch (bind-key stores the command string; tmux only runs it on keypress). Mirror the existing nav-binding block (the `for lp_c in ...` loops).\n2. INPUT: get_opt (options.sh); the activate T4 binding structure in livepicker.sh.\n3. LOGIC: options.sh — add opt_rename_key() default \"C-r\", opt_delete_key() default \"M-BSpace\", opt_confirm_delete() default \"off\". livepicker.sh activate T4 — AFTER the nav `for lp_c in $(opt_prev_key)...` block, add: `tmux bind-key -T livepicker \"$(opt_rename_key)\" run-shell \"$CURRENT_DIR/input-handler.sh rename\"` and `tmux bind-key -T livepicker \"$(opt_delete_key)\" run-shell \"$CURRENT_DIR/input-handler.sh delete\"`. Single-key accessors (not space-list) per PRD §11.\n4. OUTPUT: the 2 keys are bound in the livepicker table; the 3 options exist. Inert until dispatch lands in P2.M1.T2.\n5. DOCS: [Mode A] Add @livepicker-rename-key, @livepicker-delete-key, @livepicker-confirm-delete rows to README.md Configuration table; add the rename/delete keybinds + 'driver/last-session refuse' + 'delete key terminal caveat (M-BSpace may be stripped on some terminals; rebind C-h/DC)' notes to README.md Usage. Full prose in P4.",
@@ -428,7 +428,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T2.S1",
                   "title": "Implement rename (command-prompt + do-rename) + input dispatch",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S1",
