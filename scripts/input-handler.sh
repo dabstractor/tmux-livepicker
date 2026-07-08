@@ -59,6 +59,8 @@ source "$CURRENT_DIR/utils.sh"
 source "$CURRENT_DIR/state.sh"
 # shellcheck source=rank.sh
 source "$CURRENT_DIR/rank.sh"
+# shellcheck source=layout.sh
+source "$CURRENT_DIR/layout.sh"   # P1.M3.T2.S1: lp_viewport (shared §19 viewport math; §P7) — scroll-into-view
 
 # _confirm_land_on_session TARGET — the shared "switch to a chosen session and
 # tear down to leave the client there" sequence. Called by BOTH the session-mode
@@ -143,6 +145,27 @@ _lp_sync_preview_to_top_match() {
 	_lp_preview_follow "$_top"
 }
 
+# _lp_scroll_into_view IDX RANKED — PRD §19 §3.32: keep @livepicker-scroll tracking the
+# highlight so the viewport follows the keypress. Pure STATE math via layout.sh::lp_viewport
+# (the SAME function the renderer slices with -> they can never disagree, §P7). Reads
+# STATE_CLIENT_WIDTH (T) + STATE_SCROLL, runs lp_viewport's scroll-into-view rule (snap scroll
+# to IDX if IDX<scroll; advance scroll while the highlight tab overflows T; clamp 0 when it
+# fits / when width is unknown), and writes the result to STATE_SCROLL.
+# T = client_width is a conservative approximation (the renderer's tab-region T is narrower:
+# − query block − indicators); it is SAFE because the renderer re-runs lp_viewport every redraw
+# (steps a+b) and self-corrects — the highlight is ALWAYS visible regardless of STATE_SCROLL.
+# So this write is STATE hygiene (keep scroll tracking), not a render-correctness requirement.
+# Scroll is a synchronous STATE write (part of the §18 status update) — NO preview work; the
+# nav preview re-sync stays deferred via the caller's _lp_preview_follow call.
+_lp_scroll_into_view() {
+	local idx="${1:-0}" ranked="${2:-}"
+	local width scroll
+	width="$(get_state "$STATE_CLIENT_WIDTH" "0")"
+	scroll="$(get_state "$STATE_SCROLL" "0")"
+	lp_viewport "$ranked" "$width" "$scroll" "$idx"   # SEP_WIDTH defaults to 1 (plain-mode space)
+	set_state "$STATE_SCROLL" "$LPV_SCROLL"
+}
+
 # _lp_fire_preview TARGET — schedule a background, supersedeable preview of TARGET
 # (PRD §18; external_tmux_behavior.md Q6). Bumps the monotonic STATE_PREVIEW_SEQ,
 # records STATE_PREVIEW_TARGET, then launches preview.sh detached via run-shell -b
@@ -213,6 +236,9 @@ input_main() {
 			# now ALSO follows the top match (PRD §3 story 3 / README "the preview
 			# follows live") via _lp_sync_preview_to_top_match, mirroring nav.
 			set_state "$STATE_INDEX" "0"
+			# Reset the viewport scroll to the top (PRD §19 §3.32). A status-only STATE write
+			# (part of the synchronous status update; NO preview work — §18).
+			set_state "$STATE_SCROLL" "0"
 			# Sync the live preview to the new top filtered match (PRD §3 / README;
 			# mirror next/prev). Always index 0 — these branches just reset it.
 			_lp_sync_preview_to_top_match
@@ -248,6 +274,9 @@ input_main() {
 			# Reset the highlight to the top filtered match (PRD §6). Always
 			# safe — the renderer clamps + handles FLEN=0 itself.
 			set_state "$STATE_INDEX" "0"
+			# Reset the viewport scroll to the top (PRD §19 §3.32). A status-only STATE write
+			# (part of the synchronous status update; NO preview work — §18).
+			set_state "$STATE_SCROLL" "0"
 			# Sync the live preview to the new top filtered match (PRD §3 / README;
 			# mirror next/prev). Always index 0 — these branches just reset it.
 			_lp_sync_preview_to_top_match
@@ -279,6 +308,9 @@ input_main() {
 			# refresh (so the highlight + the live preview agree — FINDING 5).
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
+			# PRD §19 §3.32: scroll the highlight into view (synchronous STATE write; no preview
+			# work — the deferred preview re-sync via _lp_preview_follow below is unchanged, §18).
+			_lp_scroll_into_view "$new_idx" "$(printf '%s\n' "${filtered[@]}")"
 			# Delegate the live link/select to preview.sh (P1.M3; FINDING 9). It
 			# fires session-window-changed (suppressed by activate T4.S2) but
 			# NEVER client-session-changed (Invariant A). _lp_preview_follow redraws +
@@ -301,6 +333,9 @@ input_main() {
 			new_idx=$(( (cur_index - 1 + L) % L ))
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
+			# PRD §19 §3.32: scroll the highlight into view (synchronous STATE write; no preview
+			# work — the deferred preview re-sync via _lp_preview_follow below is unchanged, §18).
+			_lp_scroll_into_view "$new_idx" "$(printf '%s\n' "${filtered[@]}")"
 			_lp_preview_follow "$target"
 			return 0
 			;;
@@ -434,6 +469,9 @@ input_main() {
 				# safe — the renderer clamps + handles FLEN=0 (empty filter matches
 				# ALL names; renderer FINDING 4 / rank.sh).
 				set_state "$STATE_INDEX" "0"
+				# Reset the viewport scroll to the top (PRD §19 §3.32). A status-only STATE write
+				# (part of the synchronous status update; NO preview work — §18).
+				set_state "$STATE_SCROLL" "0"
 				# Sync the live preview to the new top filtered match (PRD §3 / README;
 				# mirror next/prev). Always index 0 — these branches just reset it.
 				_lp_sync_preview_to_top_match

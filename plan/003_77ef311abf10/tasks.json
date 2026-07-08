@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Status-line layout & fuzzy ranking (PRD §19 + §20)",
-      "status": "Planned",
+      "status": "Researching",
       "description": "The central rework: turn the picker from a substring filter with a trailing index/total into a fuzzy-ranked, scrollable, query-bar status line. §19 (layout: query bar pinned far-left + ranked tabs in a left-to-right scroll viewport + overflow indicators, count removed) and §20 (ranking: subsequence match + score) are one phase because the layout renders the order the ranker produces, and both feed the same shared lp_rank the renderer and input-handler index into. Replaces scripts/filter.sh with scripts/rank.sh; adds scripts/layout.sh; reworks renderer.sh; wires scroll state into input paths.",
       "milestones": [
         {
@@ -291,21 +291,21 @@
           "type": "Milestone",
           "id": "P1.M4",
           "title": "Validation (§15.28 layout / ranking / scroll)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "New/updated integration test suites under the existing socket-isolated harness, mirroring the new §15.28 checklist. Renderer tests need no client (seed state → run renderer.sh → assert_contains); nav/scroll tests need attach_test_client.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M4.T1",
               "title": "test_layout.sh — renderer layout integration suite",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Assert the §19 layout: empty query → only tabs justified, no icon/query/count; one char → icon+query at column 0, exactly query-gap spaces, ranked tabs; overflow → +N> with N=total hidden, < after scrolling, neither when all fit; no-match → (no match); no index/total anywhere. Assert the window-status path also honors §19.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T1.S1",
                   "title": "Create test_layout.sh (empty/active/overflow/no-match/no-count, both tab styles)",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T3.S1"
@@ -324,14 +324,14 @@
               "type": "Task",
               "id": "P1.M4.T2",
               "title": "test_ranking.sh — fuzzy ranking integration suite",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Assert the §20 ranking: query 'log' → logs-prod outranks blog-engine (prefix > deep subsequence); a non-subsequence name is hidden; empty query preserves tmux order (no reordering); renderer/nav/confirm all agree on ranked[index] (no drift). Assert performance is within the §18 budget for N up to a few hundred.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T2.S1",
                   "title": "Create test_ranking.sh (prefix>subsequence, hidden, empty order, no-drift, perf)",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"
@@ -350,14 +350,14 @@
               "type": "Task",
               "id": "P1.M4.T3",
               "title": "Scroll-into-view + client-width cache tests",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Assert: nav past the right edge scrolls the highlight into view and shows <; resizing the client updates @livepicker-client-width via the client-resized hook and the next redraw recomputes the viewport; after exit the prior client-resized hook is restored exactly; type/backspace/cancel-clear reset scroll to 0.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T3.S1",
                   "title": "Create scroll + client-width cache tests",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M3.T2.S1",
