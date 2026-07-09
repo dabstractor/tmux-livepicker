@@ -26,7 +26,7 @@ timeline or its Alt-Tab style toggle.
   from your filter query.
 - **Zero history pollution.** Browsing fires no `client-session-changed`, so
   session history and the toggle pointer are untouched while you browse.
-- **Exact restore.** Cancel leaves no trace — status, keys, focus, and hooks are
+- **Exact restore.** Cancel leaves no trace: status, keys, focus, and hooks are
   byte-for-byte restored.
 
 ## Non-goals
@@ -43,20 +43,21 @@ timeline or its Alt-Tab style toggle.
   in the status bar with a live preview below it.
 - **Navigate.** I press my next/previous window keys and the selection moves to a
   different session, with the preview following live.
-- **Filter.** I type `log` and the list narrows to sessions whose names contain
-  `log`.
+- **Filter.** I type `log` and the list narrows to sessions whose names
+  fuzzy-match `log` (characters in order, not necessarily contiguous), with the
+  best match first.
 - **Confirm.** I press `Enter` and land on the selected session.
 - **Create.** I type `newproj` (no match) and press `Enter`; a new `newproj`
   session is created and I am switched to it.
   Characters tmux disallows in
-  session names (such as `.`) are sanitized — `my.proj` becomes `my_proj` —
+  session names (such as `.`) are sanitized (`my.proj` becomes `my_proj`),
   and you still land on the created session.
 - **Cancel.** I press `Escape` (or `Escape` twice) and everything is restored
   exactly as if I had never opened the picker.
 
 ## Installation
 
-**Option A — [Tmux Plugin Manager](https://github.com/tmux-plugins/tpm):**
+**Option A: [Tmux Plugin Manager](https://github.com/tmux-plugins/tpm):**
 
 ```tmux
 set -g @plugin '<your-org>/tmux-livepicker'
@@ -64,7 +65,7 @@ set -g @plugin '<your-org>/tmux-livepicker'
 
 Reload your config and press `prefix + I` to install.
 
-**Option B — manual `run-shell` (no TPM step; mirrors tmux-thumbs):**
+**Option B: manual `run-shell` (no TPM step; mirrors tmux-thumbs):**
 
 ```sh
 git clone <repo-url> ~/.config/tmux/plugins/tmux-livepicker
@@ -76,7 +77,7 @@ run-shell '~/.config/tmux/plugins/tmux-livepicker/plugin.tmux'
 
 > `@livepicker-key` is **required**. If it is unset, the plugin prints a
 > `display-message` (`tmux-livepicker: set @livepicker-key to activate`) and
-> binds nothing — it still loads cleanly. Set it before first use:
+> binds nothing; it still loads cleanly. Set it before first use:
 
 ```tmux
 set -g @livepicker-key 'Space'
@@ -115,7 +116,6 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-bg`                   | `default`  | Picker background.                                                                                   |
 | `@livepicker-highlight-fg`         | `black`    | Highlighted (current) item text.                                                                     |
 | `@livepicker-highlight-bg`         | `yellow`   | Highlighted item background.                                                                         |
-| `@livepicker-show-count`           | `on`       | Show `index/total` in the picker.                                                                    |
 | `@livepicker-status-format-index`  | `0`        | Which status line the picker takes.                                                                  |
 | `@livepicker-nerd-fonts`            | `on`       | Opt-out for the search icon (tmux cannot detect the terminal font). `on` shows the icon; `off` shows query text only. |
 | `@livepicker-search-icon`           | `\uf002`   | The icon glyph shown before the query while typing. Default is `nf-fa-search` (U+F002); raw UTF-8 bytes in the source. |
@@ -134,37 +134,41 @@ set -g @livepicker-highlight-bg 'magenta'
 
 The picker can match your window-status theme. Set `@livepicker-tab-style window-status` and the picker renders its items through the theme's own `window-status-current-format` / `window-status-format`, so the tabs read as part of the status bar under any theme. The default is `plain`, which uses the standalone `@livepicker-fg` / `bg` / `highlight-*` colors. If the theme format cannot be resolved, the picker falls back to `plain`, so the option never breaks your status bar.
 
+Both `plain` and `window-status` styles draw line 1 from the same layout described in [Status line](#status-line): with a query active the query is pinned far left, the tabs flow left-to-right windowed by scroll, and the overflow indicators apply; `status-justify` is honored only when there is no query and the tabs fit. One source of truth for line 1, two render styles for the tab glyphs.
+
 ### Performance
 
 The live preview is deferred by default. Typing and navigation redraw the status line immediately; the preview re-link runs in the background, so neither waits on `link-window` / `select-window`. Set `@livepicker-preview-defer off` to restore the synchronous preview path (useful for diagnosis).
 
+### Status line
+
+Line 1 of the status bar is the picker. Its layout is the same for both `plain` and `window-status` tab styles, and it changes with the query.
+
+- **Query bar.** A search icon (`@livepicker-search-icon`, a magnifier by default) followed by your query sits at the far left of line 1, but only while you are typing. On open, or after you clear the query, there is no icon, no query, and no gap: line 1 shows only the session tabs. The icon shows when `@livepicker-nerd-fonts` is `on` (the default); tmux cannot detect your font, so set it `off` if you see a missing-glyph box. Exactly `@livepicker-query-gap` spaces (default `2`) separate the query from the first tab while a query is active.
+- **Tabs.** The tabs run left-to-right, fuzzy-ranked (a subsequence match: every query character appears in order, case-insensitive, not necessarily contiguous), with the best match first and non-matches hidden. With an empty query, all sessions show in tmux's default order. Tabs are windowed by scroll; typing, backspace, or clearing the query resets the scroll to the far left, and next/previous scroll the highlight into view.
+- **Overflow indicators.** When the tabs do not fit, a right `+N>` (`@livepicker-overflow-right-format`, default `+%d>`) shows the total number of hidden tabs, left and right combined, and a left `<` (`@livepicker-overflow-left`, default `<`) appears when the scroll is past the far left. Both can show at once (`< tabs +N>`); neither shows when everything fits.
+- **No count.** The picker shows no position or total count anywhere.
+- **No match.** With no matching session, line 1 shows the icon and query followed by ` (no match)`; create-on-Enter still applies.
+- **Justify.** While a query is active, `status-justify` is suspended because the query is pinned left and the tabs must flow left-to-right for the scroll viewport. `status-justify` is honored only when there is no query and the tabs fit.
+
 ## Usage
 
-1. **Activate** — press your prefix, then `@livepicker-key` (`Space` by default).
-   With [tubular](https://github.com/danutatubu/tubular-tmux) the prefix is
-   `None` and `C-Space` enters the prefix table, so the sequence is
-   `C-Space` → `Space`. The status bar grows to two lines: line 1 is the picker;
-   the area below shows the highlighted candidate's panes, live.
-2. **Filter** — type to filter the list (substring, case-insensitive); `BSpace`
-   removes a character.
-3. **Navigate** — `C-M-Tab` / `C-M-BTab` (your window-nav keys, repurposed) or
-   `Down` / `Up` move the selection. The preview follows live. Plain letters
-   and digits are reserved for the query, so `j`/`k` (and every other letter)
-   are typeable by default; set `@livepicker-nav-next-keys`/`-prev-keys` to add
-   vim-style `j`/`k` nav at the cost of typing them.
-4. **Confirm** — `Enter` lands on the selection. In `session` mode with no match
-   and `@livepicker-create on`, it creates a session from your query and switches
-   to it.
-5. **Cancel** — `Escape` clears the query if non-empty, otherwise cancels and
-   restores your status line, key table, and focus exactly.
-6. **Rename / delete** — `C-r` (`@livepicker-rename-key`) renames the
-   highlighted session via tmux's prompt; `M-BSpace`
-   (`@livepicker-delete-key`) kills it. Deleting is refused for the driver
-   session you launched the picker from and for the last remaining session.
-   Set `@livepicker-confirm-delete on` to require a `y/n` prompt before a
-   kill. Note: a few older terminals or SSH/mosh links strip Alt-modified
-   keys; if `M-BSpace` does not fire, rebind `@livepicker-delete-key` to
-   `C-h` or `DC` (Delete).
+1. **Activate:** press your prefix, then `@livepicker-key` (`Space` by
+   default). The status bar grows to two lines: the picker, with a live
+   preview of the highlighted candidate below.
+2. **Filter:** type to filter; matching is fuzzy and ranked best-first
+   (see [Status line](#status-line)). `BSpace` removes a character.
+3. **Navigate:** `C-M-Tab` / `C-M-BTab` or `Down` / `Up` move the
+   selection; the preview follows live.
+4. **Confirm:** `Enter` lands on the selection, or creates a session from
+   your query in `session` mode with no match.
+5. **Cancel:** `Escape` clears the query if non-empty, otherwise cancels and
+   restores everything exactly.
+6. **Rename / delete:** `C-r` renames the highlighted session; `M-BSpace`
+   kills it. See [Session management](#session-management).
+
+- With [tubular](https://github.com/danutatubu/tubular-tmux), the prefix is `None` and `C-Space` enters the prefix table, so the activate sequence is `C-Space` → `Space`.
+- Letters and digits go to the query by default; set `@livepicker-nav-next-keys` / `-prev-keys` to `j` / `k` for vim-style navigation at the cost of typing them.
 
 While the picker is active, the key table is fully modal: keys not explicitly
 bound to a picker action (typing, navigation, confirm, cancel) or carried over
@@ -172,6 +176,19 @@ from your prefix/root tables are dropped and never reach the previewed panes.
 Carried-over bindings are filtered to exclude any command that would switch the
 session/window or mutate window/pane state, so browsing stays pollution-free and
 the live preview remains display-only.
+
+### Session management
+
+Rename and delete act on the highlighted (and previewed) session, resolved the
+same way as confirm and navigation. With `@livepicker-type window` they act on
+the highlighted window analogously.
+
+- **Rename.** `@livepicker-rename-key` (default `C-r`) opens tmux's `command-prompt` pre-filled with the current name; on submit the session is renamed, the list is rewritten, and the highlight stays on the renamed session while the picker remains open. It is a control key, so it never collides with typing.
+- **Delete.** `@livepicker-delete-key` (default `M-BSpace`) kills the highlighted session.
+- **Delete guards.** The kill is refused with a `display-message` (no kill happens) for the driver session you launched the picker from (killing it detaches your client and destroys the picker host) and for the last remaining session (tmux requires at least one).
+- **Confirm.** `@livepicker-confirm-delete on` prompts `y/n` via `confirm-before` before a kill; the default `off` is immediate.
+- **Delete-key caveat.** A few older terminals or SSH/mosh links strip Alt-modified keys entirely. If `M-BSpace` does not fire there, rebind `@livepicker-delete-key` to `C-h` or `DC` (Delete).
+- **Escaping limitation.** Session names containing a single quote, double quote, backtick, or dollar sign may break the rename prompt. tmux also rejects `:` in a session name. Such names are rare; this is a known limitation.
 
 ## How it works
 
@@ -186,27 +203,10 @@ at confirm. Cancelling leaves zero trace.
 
 ### Known limitations
 
-- **Detached candidate windows are resized during preview.** When a detached
-  candidate window is linked into the attached driver session for live
-  preview, tmux resizes the shared window object to the driver's dimensions.
-  After the picker exits, the candidate's window retains the driver's size
-  rather than its original dimensions. This is inherent to tmux's
-  `window-size` behavior and affects only detached candidate sessions. To
-  avoid this, set `@livepicker-preview-mode snapshot` (uses `capture-pane`
-  and never links the window).
+Two preview-resizing effects stem from tmux's `window-size` behavior on a linked (live) preview window. One is fixed by default; the other persists.
 
-  Two distinct effects share this `window-size` behavior:
-  - *Status-bar grow reflow* — the one-row pane reflow that fires when the
-    picker's status bar grows from one line to two on activation. The default
-    `@livepicker-preview-fit clip` addresses this: the driver window's height
-    is pinned before the grow, so the extra status line clips the bottom row
-    instead of reflowing the panes. Set `@livepicker-preview-fit reflow` to
-    restore the legacy reflow if `clip` misbehaves on your tmux/terminal.
-  - *Candidate link-time resize* — the one-time resize of a *linked candidate*
-    to the driver's dimensions described above. This persists under `clip`
-    (a linked window shares one size across every session it belongs to, so the
-    clip pin does not eliminate it). To avoid it, set
-    `@livepicker-preview-mode snapshot`.
+- **Status-grow reflow is fixed by default.** Growing the status bar from one line to two on activation used to shrink the preview's panes by one row, the visible jank on open. With the default `@livepicker-preview-fit` `clip`, the preview height is frozen before the status grows and the bottom row is clipped instead, so no pane reflows. Set `@livepicker-preview-fit` `reflow` to get the old one-row shrink back if `clip` misbehaves on your tmux or terminal.
+- **Detached candidates still resize once at link time.** When you navigate to a detached candidate, tmux links its window into the driver and resizes it once to the driver's size. A linked window is a single shared object, so the candidate's own session keeps that size after the picker exits. `clip` does not change this. Set `@livepicker-preview-mode` `snapshot` to preview with `capture-pane` and never link (and never resize) the candidate.
 
 ## Compatibility
 
@@ -215,12 +215,12 @@ at confirm. Cancelling leaves zero trace.
 - Composes with the rest of the stack. It mutates only well-scoped global options
   (`status`, `status-format[n]`, the key table, and the
   `session-window-changed` hook) and restores every one of them on exit:
-  - **tmux-session-history** — the timeline this plugin is designed not to
+  - **tmux-session-history:** the timeline this plugin is designed not to
     disturb (browsing fires no `client-session-changed`).
-  - **tmux-sessionx** — different prefix key (`C-Space` vs `Space`); no clash.
-  - **tmux-resurrect / continuum** — saves/restores from disk; no live-state
+  - **tmux-sessionx:** different prefix key (`C-Space` vs `Space`); no clash.
+  - **tmux-resurrect / continuum:** saves/restores from disk; no live-state
     overlap.
-  - **tubular** — owns `status*` and `window-status*`; livepicker overrides
+  - **tubular:** owns `status*` and `window-status*`; livepicker overrides
     `status-format[0]` on top and restores it with `set-option -gu status-format`
     on exit, leaving tubular's styles intact.
 - Note: with tubular, `prefix` is `None` and `C-Space` enters the prefix table,
@@ -238,16 +238,16 @@ touched. It prints `PASS` / `FAIL` per test plus a summary and exits `0` iff all
 passed. Expect the full suite to take roughly **2–3 minutes** (each test starts
 a fresh isolated tmux server and sources the user config). The suites cover the PRD §15 clusters:
 
-- **Functional** — activation, filtering, navigation, confirm, cancel.
-- **Live preview** — the all-panes in-place preview.
-- **Pollution invariant** — browsing fires no `client-session-changed`.
-- **Byte-exact restore** — status, keys, focus, and hooks are restored.
-- **Key repurpose** — repurposed window-nav keys revert on cancel.
-- **Create on Enter** — session creation from an unmatched query.
+- **Functional:** activation, filtering, navigation, confirm, cancel.
+- **Live preview:** the all-panes in-place preview.
+- **Pollution invariant:** browsing fires no `client-session-changed`.
+- **Byte-exact restore:** status, keys, focus, and hooks are restored.
+- **Key repurpose:** repurposed window-nav keys revert on cancel.
+- **Create on Enter:** session creation from an unmatched query.
 
 ## Maintenance
 
 `PRD.md` §0 ("Prior attempt") is a build-time scaffold left in place during
 implementation. It should be removed by a human after post-verification of the
-shipped plugin — this README intentionally does **not** edit `PRD.md`. Release
+shipped plugin; this README intentionally does **not** edit `PRD.md`. Release
 notes and the version bump live in the CHANGELOG (maintained separately).
