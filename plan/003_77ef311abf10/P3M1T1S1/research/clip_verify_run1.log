@@ -1,0 +1,29 @@
+clip_verify_probe.sh — tmux 3.6b
+REAL SERVER BEFORE (23 sessions): evoskill,formality,hack,hypr,job hunt,main,necromancer,nvim,qmkonnect,resume,sellario,skilldozer,split-editor,stagecoach,termcolor,tmux,tubular,web-search-prime-fixer,website-leadgen,whisper,writing,writing skills,zsh
+
+========== CONTROL — no freeze, grow status 1->2 (expect REFLOW) ==========
+  before grow : height=23 layout=4a2d,80x23,0,0{40x23,0,0[40x11,0,0,3,40x11,0,12,5],39x23,41,0,4}
+  after  grow : height=22 layout=851c,80x22,0,0{40x22,0,0[40x10,0,0,3,40x11,0,11,5],39x22,41,0,4}
+  CONTROL: REFLOW confirmed (height 23->22, layout changed) PASS
+
+========== TREATMENT — window-size manual + resize-window -y H0, THEN grow (expect CLIP) ==========
+  before freeze/grow : height=23 layout=4a2d,80x23,0,0{40x23,0,0[40x11,0,0,3,40x11,0,12,5],39x23,41,0,4}
+  after  grow 1->2   : height=23 layout=4a2d,80x23,0,0{40x23,0,0[40x11,0,0,3,40x11,0,12,5],39x23,41,0,4}
+  after  grow 2->3   : height=23 layout=4a2d,80x23,0,0{40x23,0,0[40x11,0,0,3,40x11,0,12,5],39x23,41,0,4}
+  TREATMENT grow 1->2: CLIP confirmed (height 23==23, layout byte-identical) PASS
+  TREATMENT grow 2->3: pin survives second grow (height 23==23) PASS
+  isolation: driver=[manual] alpha=[] global=[latest]
+
+========== CANDIDATE RESIDUAL — linked candidate link-time resize + no per-nav reflow ==========
+  driver self-window pinned: height=23 layout=4a2d,80x23,0,0{40x23,0,0[40x11,0,0,3,40x11,0,12,5],39x23,41,0,4}
+  alpha source window: id=@1
+  alpha source BEFORE link: height=40 layout=f924,120x40,0,0{60x40,0,0,1,59x40,61,0,7}
+  linked alpha IN driver : height=22 layout=6004,80x22,0,0{40x22,0,0,1,39x22,41,0,7}
+  alpha source AFTER link: height=22 layout=6004,80x22,0,0{40x22,0,0,1,39x22,41,0,7}
+  alpha-linked AFTER 2nd nav: height=22 layout=6004,80x22,0,0{40x22,0,0,1,39x22,41,0,7}
+  CANDIDATE: NO per-nav reflow (layout byte-identical across 2nd nav) PASS
+  CANDIDATE residual: link-time resize to driver usable; source view also resized (shared window)
+
+REAL SERVER AFTER  (23 sessions): evoskill,formality,hack,hypr,job hunt,main,necromancer,nvim,qmkonnect,resume,sellario,skilldozer,split-editor,stagecoach,termcolor,tmux,tubular,web-search-prime-fixer,website-leadgen,whisper,writing,writing skills,zsh
+
+========== NON-POLLUTION: REAL SERVER BYTE-IDENTICAL before/after (PASS) ==========
