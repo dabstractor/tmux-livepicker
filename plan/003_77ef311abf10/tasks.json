@@ -382,7 +382,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Session management: rename / delete (PRD §21)",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Depends on P1: rename/delete resolve the highlighted item via lp_rank + @livepicker-index, and re-rank after the mutation. Adds scripts/session-mgmt.sh, three options (rename-key, delete-key, confirm-delete), two key bindings (activate step 5), and two input-handler actions (rename, delete). Session-CRUD parity with tmux-sessionx so livepicker can replace it.",
       "milestones": [
         {
@@ -469,21 +469,21 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Validation",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Integration test suite for rename/delete under the isolated socket.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "test_session_mgmt.sh — rename/delete integration suite",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Assert: rename opens the prompt pre-filled, a new name updates the tab in place, keeps the highlight, picker stays open; sanitized/collision names abort with a message and no rename; delete kills and removes the highlighted session, a neighbour is highlighted+previewed; driver and last session refuse with a message and no kill; deleting the currently-previewed session unlinks the preview window first (no orphan leak); confirm-delete on prompts y/n.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Create test_session_mgmt.sh (rename, sanitized/collision, delete, guards, leak, confirm)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T2.S2"
@@ -514,21 +514,21 @@
           "type": "Milestone",
           "id": "P3.M1",
           "title": "window-size save/freeze/restore + option (gated by empirical verification)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "First confirm clip feasibility on tmux 3.6b (the load-bearing gate), then implement the window-size save (activate) / freeze-to-manual / restore (restore.sh) + the preview-fit option. The empirical verification (T1) decides whether clip is shipped as default or falls back to reflow.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Empirical verification of clip feasibility on tmux 3.6b (load-bearing, gates implementation)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Before coding the freeze, confirm on the isolated socket that (a) a window-size manual session clips an oversized active window (bottom row hidden, not force-resized), (b) set-option -t isolates to the driver, (c) the self-session window present at the status-grow moment does not reflow. Record findings. If the self-window clip is clean, ship clip as default; the linked-candidate link-time resize stays the documented limitation.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Run + document clip verification on 3.6b; decide clip vs reflow default",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: MOST of this is ALREADY DONE — see plan/003_77ef311abf10/architecture/empirical_findings.md (Finding 1: manual clips an oversized non-shared window, CONFIRMED; Finding 2: shared linked windows reflow ~1 row on status-grow, CONFIRMED partial). This subtask EXTENDS/confirms those in the FULL plugin lifecycle (freeze → grow status → self-window preview → nav re-link) using the test harness's attach_test_client, and records the decision. The key question to settle: does freezing the driver to manual BEFORE the status grow prevent the SELF-session window (the initial preview) from reflowing? empirical EXP A says yes (window stayed 30); EXP F's exact heights were timing-sensitive — confirm the freeze-before-grow ordering yields a non-reflowing self-window.\n2. INPUT: The isolated -L socket + attach_test_client pattern; the empirical_findings.md results.\n3. LOGIC: Run a focused experiment mirroring the real activate flow: isolated socket, attach client, create a multi-pane driver window, set window-size manual, grow status to 2, assert the self-window's pane layout is UNCHANGED (no reflow) by diffing window_layout before vs after. Then link a candidate window (post-grow) and assert it comes in at the driver size (link-time resize, documented) with no PER-NAV additional reflow. Write the findings + the decision (clip default vs reflow) to plan/003_77ef311abf10/architecture/clip_verification.md. If the self-window reflows despite manual, document that clip is infeasible and the default must be reflow (or snapshot).\n4. OUTPUT: clip_verification.md states whether clip is shipped as default and documents the residual (linked-candidate link-time resize). This GATES P3.M1.T2 — do not implement the freeze until this decision is recorded.\n5. DOCS: none (internal research doc).",
@@ -546,14 +546,14 @@
               "type": "Task",
               "id": "P3.M1.T2",
               "title": "window-size save/freeze/restore + preview-fit option",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add opt_preview_fit (clip). Add ORIG_WINDOW_SIZE to the saved-state contract. In activate, when clip, save the driver's current window-size then set-option -t driver window-size manual BEFORE the status grow. In restore STEP 4, restore the driver's window-size to ORIG_WINDOW_SIZE. reflow mode skips the freeze/restore entirely. Reconcile the §10 step-4 ordering (freeze first, then grow status).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T2.S1",
                   "title": "Add opt_preview_fit + ORIG_WINDOW_SIZE; freeze in activate; restore in restore.sh",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S1"
