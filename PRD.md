@@ -169,8 +169,8 @@ scripts/livepicker.sh (activate)
   |- set initial selection (index 0, scroll 0); run first preview
 
 scripts/input-handler.sh <action> [arg]
-  |- type / backspace: update @livepicker-filter; rank; reset index=0 + scroll=0; refresh status
-  |- next-session / prev-session: move @livepicker-index; scroll-into-view (section 19); refresh preview + status
+  |- type / backspace: update @livepicker-filter; rank; reset index=0 + scroll=0; refresh status FIRST, then defer a preview to the top match (section 18)
+  |- next-session / prev-session: move @livepicker-index; refresh status FIRST (highlight moves); scroll-into-view (section 19); defer the preview
   |- confirm: resolve target from ranked list; create if needed; switch-client once; restore
   |- cancel: clear the query (reset index+scroll); or restore everything if query already empty
   `- rename / delete: delegate to scripts/session-mgmt.sh (section 21)
@@ -183,7 +183,7 @@ scripts/preview.sh <session>
   `- link candidate active window into current session; select it (all panes live)
 
 scripts/renderer.sh
-  `- #() status command: query bar (far left) + ranked tabs in a scroll viewport + overflow indicators (section 19/20); PURE + FAST (<50ms; option reads + pure-bash rank/measure)
+  `- #() status command: query bar (far left) + ranked tabs in a scroll viewport + overflow indicators (section 19/20); re-evaluated ASYNC by the server on refresh-client -S (never blocks the keystroke). Reads dynamic state (list/filter/index/scroll/width) live; caches static config once at activation (@livepicker-render-cache) and measures tab width fork-free, so the redraw stays within the section 16 budget (~60ms on a ~15-session list)
 
 scripts/rank.sh (sourced lib)   — lp_rank: fuzzy subsequence match + score (section 20); sourced by renderer + input-handler + session-mgmt (single source of truth)
 scripts/layout.sh (sourced lib) — lp_viewport: tab-width measurement + scroll-into-view math (section 19); sourced by renderer + input-handler
@@ -801,11 +801,14 @@ With `tmux-session-history` installed:
   string length). The measurement lives once in `scripts/layout.sh` and is used
   by both the renderer (to slice the visible window) and the input-handler (to
   scroll-into-view) so they cannot disagree. Re-derive the slice every redraw;
-  clamp `@livepicker-scroll` to 0 when the list now fits.
+  measure width FORK-FREE (`_lp_measure_into` — a subshell per tab would
+  dominate the redraw cost); clamp `@livepicker-scroll` to 0 when the list now fits.
 - **Fuzzy ranking cost.** `lp_rank` is O(N·Q) per redraw in pure bash; verify it
-  stays under the section 18 renderer budget for N up to a few hundred. No
-  caching is required, but the rank function must be sourced once per process
-  and loop tightly (no per-name subshells).
+  stays under the section 18 renderer budget for N up to a few hundred. The
+  ranker needs no caching (sourced once per process, no per-name subshells). Note
+  the renderer separately caches its STATIC `@livepicker-*` config once at
+  activation (`@livepicker-render-cache`): each `tmux show-option` forks a client
+  (~3–4 ms), so reading ~10 of them per redraw would otherwise bust the budget.
 - **`command-prompt` substitution.** The rename template uses `%%` inside a
   single-quoted `run-shell`; names containing `'`, `"`, `` ` ``, or `$` can
   break the substitution. tmux rejects `:` in session names and sanitizes
@@ -921,18 +924,33 @@ preview re-link is the expensive part and it blocks the status redraw, so each
 letter waits on the previous letter's preview. Navigation has the same shape.
 This is why fast typing and quick tab moves feel laggy.
 
+**A second root cause: the redraw itself.** Deferring the preview is necessary
+but not sufficient — the status redraw that tracks each keystroke is itself a
+`#()` renderer process, and its cost dominates perceived latency (validation
+section 3.26 asserts exactly this). Every `tmux show-option` in the renderer
+forks a client (~3–4 ms), so re-reading ~10 static `@livepicker-*` options per
+redraw *plus* a per-tab subshell in the width pass made each redraw ~200 ms on a
+modest list — well over the section 16 budget. The renderer therefore caches its
+static config once at activation (`@livepicker-render-cache`, one read per redraw
+with a fresh-read fallback) and measures tab width fork-free (`_lp_measure_into`),
+bringing the redraw back under budget (~60 ms on a ~15-session list, A/B vs ~200 ms).
+
 **The contract.**
 
-1. **Typing path is status-only and synchronous.** A typed/backspaced character
-   does exactly two things, synchronously: update `@livepicker-filter` (and
-   reset the index to the top match), then `refresh-client -S`. No
-   `link-window`, no `select-window`, no preview work on this path. The `#()`
-   renderer is cheap (option reads only), so the status reflects the new query
-   within a frame.
+1. **Typing path is status-first, then a deferred preview.** A typed/backspaced
+   character updates `@livepicker-filter` and resets index+scroll synchronously,
+   then calls `refresh-client -S` *immediately* so the status reflects the new
+   query before anything else; it then defers a preview to the new top match (the
+   preview "follows live", section 3) on a supersedeable background job — never
+   inline, never blocking. The status redraw is the latency-priority step, and it
+   stays fast only because the renderer's static `@livepicker-*` config is cached
+   once at activation (`@livepicker-render-cache`) and its tab-width pass is
+   fork-free (see the second-root-cause note above).
 2. **Navigation moves the highlight synchronously, defers the preview.**
-   `next-session`/`prev-session` update `@livepicker-index` and
-   `refresh-client -S` immediately; the preview re-sync is scheduled, not
-   inline.
+   `next-session`/`prev-session` update `@livepicker-index` and call
+   `refresh-client -S` *immediately* — before the scroll-catchup and the deferred
+   preview fire — so the highlight moves first; the preview re-sync is scheduled,
+   not inline.
 3. **The preview is deferred and supersedeable.** Preview work runs in the
    background (`tmux run-shell -b`), not inline in the input handler. It is
    **superseded, not queued**: if a new keystroke/selection arrives before the
@@ -1113,9 +1131,12 @@ into it directly so `ranked[index]` == the highlighted tab.
 ### Performance
 
 O(N·Q) per redraw, N = session count, Q = query length. Fine for typical
-N (< 100) in pure bash; the renderer stays within the section 18 budget. Source
-the lib once per process and loop tightly (no per-name subshell). No caching is
-required.
+N (< 100) in pure bash; the ranker itself needs no caching (sourced once per
+process, no per-name subshell). The renderer as a whole stays within the section
+18 budget only because its STATIC config is cached once at activation
+(`@livepicker-render-cache`) — each `tmux show-option` forks a client (~3–4 ms),
+so ~10 reads per redraw would otherwise dominate — and its viewport width pass is
+fork-free (`_lp_measure_into`).
 
 ## 21. Session management (rename / delete)
 
