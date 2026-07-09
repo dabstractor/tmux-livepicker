@@ -123,6 +123,31 @@ _lp_resolve_tab_templates() {
 	return 0
 }
 
+# _lp_build_render_cache — bake the renderer's STATIC config into ONE @livepicker-render-cache
+# blob (newline-separated, fixed field order) ONCE at activation, so the per-redraw renderer
+# reads ONE option instead of ~10 round-trips that each fork a tmux client (~3-4ms each).
+# After the width-fork fix (layout.sh::_lp_measure_into) this static-config read set is the
+# dominant renderer cost; caching it is the second half of making tab redraws snappy. The
+# renderer (renderer.sh::_lp_load_render_config) reads the blob once and falls back to fresh
+# per-option reads if it is absent/partial, so a missing/stale cache never breaks rendering.
+# Static config never changes during a picker session (the same assumption the §17 tab-
+# template cache already relies on). FIELD ORDER IS THE CONTRACT shared with
+# renderer.sh::_lp_load_render_config — do NOT reorder either side (12 fields):
+#   type fg bg highlight_fg highlight_bg nerd_fonts icon query_gap tab_style
+#   overflow_left overflow_right_format status_justify
+_lp_build_render_cache() {
+	local _icon _justify
+	[ "$(opt_nerd_fonts)" = on ] && _icon="$(opt_search_icon)" || _icon=""
+	_justify="$(tmux show-options -g -v status-justify 2>/dev/null)"
+	[ -n "$_justify" ] || _justify=left
+	set_state "$STATE_RENDER_CACHE" "$(printf '%s\n' \
+		"$(opt_type)" "$(opt_fg)" "$(opt_bg)" \
+		"$(opt_highlight_fg)" "$(opt_highlight_bg)" "$(opt_nerd_fonts)" \
+		"$_icon" "$(opt_query_gap)" "$(opt_tab_style)" \
+		"$(opt_overflow_left)" "$(opt_overflow_right_format)" \
+		"$_justify")"
+}
+
 activate_main() {
 	# --- STEP 1 (PRD §6.1 / §16): double-activation guard ---
 	# If a picker is already active, ignore the second activation silently. This
@@ -266,6 +291,10 @@ activate_main() {
 		tmux set-option -gu "status-format[$sf_n]"
 	done
 	# (b) install the picker renderer at the configured index (default 0).
+	# FIRST bake the renderer's STATIC config cache (§18 budget; the renderer reads this
+	# blob once per redraw instead of ~10 option round-trips). Must precede the install so
+	# the very first redraw finds it populated.
+	_lp_build_render_cache
 	lp_idx="$(opt_status_format_index)"
 	tmux set-option -g "status-format[$lp_idx]" "#($CURRENT_DIR/renderer.sh)"
 	# (b.5) P3.M1.T2.S1 — FREEZE the driver's window-size (clip mode) BEFORE the

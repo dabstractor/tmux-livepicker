@@ -40,11 +40,23 @@ set -u   # NOT -e (the strip loop's case + param expansions are control flow); N
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# _lp_strip_styles STRING — print STRING with every #[…] style run removed (zero-width
-# directives that inflate raw length). Manual case-loop (NOT a glob/regex strip — bash
-# param expansion globs can't express "#[ run of non-] chars ]" without eating visible
-# text; research FINDING 2). Pure bash, no shopt, no subshell.
-_lp_strip_styles() {
+# _LP_MEASURED — set by _lp_measure_into to the stripped codepoint width. A FORK-FREE
+# out-param so the per-tab hot loops (lp_viewport's measure pass + the renderer's
+# indicator/justify measurements) avoid the $(…) capture fork that lp_disp_width
+# historically incurred. Measured cost of that fork: ~1ms/tab; lp_viewport runs once
+# per renderer redraw AND once per input-handler scroll-into-view, and the renderer
+# is re-evaluated on EVERY status refresh — so per-tab subshells dominated the
+# viewport cost (~15ms/call). Eliminating them is the single biggest renderer win.
+_LP_MEASURED=0
+
+# _lp_measure_into STRING — set the global _LP_MEASURED to STRING's display-column
+# count: strip #[…] style runs (manual case-loop — NOT a glob/regex strip; bash param-
+# expansion globs can't express "#[ run of non-] chars ]" without eating visible text,
+# research FINDING 2), then count codepoints via ${#var} (builtin; codepoints under a
+# UTF-8 locale — FINDING 1; NOT wc -m, which is locale-dependent + subshells). Pure
+# bash, NO subshell, NO printf — call it directly in hot loops. Returns the width via
+# the _LP_MEASURED global (mirrors the LPV_* out-global convention in this file).
+_lp_measure_into() {
 	local in="${1:-}" out=""
 	while :; do
 		case "$in" in
@@ -59,17 +71,16 @@ _lp_strip_styles() {
 				;;
 		esac
 	done
-	printf '%s' "$out"
+	_LP_MEASURED=${#out}
 }
 
-# lp_disp_width STRING — print the integer display-column count: strip #[…] styles, then
-# count codepoints via ${#var} (builtin; codepoints under a UTF-8 locale — FINDING 1).
-# NOT wc -m (locale-dependent + subshell). Used by lp_viewport AND (in M2/M3) by callers
-# that need a single tab's width.
+# lp_disp_width STRING — print the integer display-column count (legacy contract for
+# callers that capture via $(…)). Implemented on the fork-free _lp_measure_into helper.
+# HOT loops should call _lp_measure_into directly and read $_LP_MEASURED to avoid the
+# command-substitution fork this wrapper still incurs.
 lp_disp_width() {
-	local s
-	s="$(_lp_strip_styles "${1:-}")"
-	printf '%s' "${#s}"
+	_lp_measure_into "${1:-}"
+	printf '%s' "$_LP_MEASURED"
 }
 
 # LPV_* — lp_viewport outputs (set each call; documented namespaced globals).
@@ -114,13 +125,15 @@ lp_viewport() {
 	[ "$scroll" -lt 0 ] && scroll=0
 	[ "$hl" -lt 0 ] && hl=0
 
-	# Measure each tab width once; accumulate the total (with separators).
+	# Measure each tab width once; accumulate the total (with separators). FORK-FREE:
+	# _lp_measure_into sets _LP_MEASURED directly (no $(…) per tab — that subshell was
+	# the dominant viewport cost; ~1ms/tab × N tabs per lp_viewport call).
 	local -a w=()
-	local i=0 total=0 wid
+	local i=0 total=0
 	for ((i = 0; i < n; i++)); do
-		wid="$(lp_disp_width "${tabs[i]}")"
-		w[i]="$wid"
-		total=$((total + wid))
+		_lp_measure_into "${tabs[i]}"
+		w[i]="$_LP_MEASURED"
+		total=$((total + w[i]))
 	done
 	total=$((total + (n - 1) * sep))
 

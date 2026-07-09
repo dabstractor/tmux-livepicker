@@ -46,7 +46,41 @@ source "$CURRENT_DIR/rank.sh"
 # shellcheck source=layout.sh
 source "$CURRENT_DIR/layout.sh"
 
+# _lp_load_render_config — populate the renderer's STATIC config from the activation-
+# cached blob (STATE_RENDER_CACHE) so the per-redraw path reads ONE option instead of
+# ~10 round-trips (each forks a tmux client ~3-4ms — the dominant renderer cost after
+# the layout.sh width-fork fix). Sets the _RC_* globals. Falls back to fresh per-option
+# reads when the cache is absent/partial (renderer ran before activate committed it, or
+# after a teardown) so rendering NEVER breaks. Field order is the CONTRACT shared with
+# livepicker.sh::_lp_build_render_cache (12 fields; do NOT reorder either side).
+_lp_load_render_config() {
+	local _blob
+	_blob="$(get_state "$STATE_RENDER_CACHE" "")"
+	if [ -n "$_blob" ]; then
+		local -a _f=()
+		mapfile -t _f <<< "$_blob"
+		if [ "${#_f[@]}" -ge 12 ]; then
+			_RC_TYPE="${_f[0]}"; _RC_FG="${_f[1]}"; _RC_BG="${_f[2]}"
+			_RC_HFG="${_f[3]}"; _RC_HBG="${_f[4]}"; _RC_NF="${_f[5]}"
+			_RC_ICON="${_f[6]}"; _RC_GAP="${_f[7]}"; _RC_TABSTYLE="${_f[8]}"
+			_RC_OVL="${_f[9]}"; _RC_OVR="${_f[10]}"; _RC_JUSTIFY="${_f[11]}"
+			return 0
+		fi
+	fi
+	# Fallback: fresh per-option reads (correct but ~10 forks slower; the pre-cache path).
+	_RC_TYPE="$(opt_type)"; _RC_FG="$(opt_fg)"; _RC_BG="$(opt_bg)"
+	_RC_HFG="$(opt_highlight_fg)"; _RC_HBG="$(opt_highlight_bg)"; _RC_NF="$(opt_nerd_fonts)"
+	[ "$_RC_NF" = on ] && _RC_ICON="$(opt_search_icon)" || _RC_ICON=""
+	_RC_GAP="$(opt_query_gap)"; _RC_TABSTYLE="$(opt_tab_style)"
+	_RC_OVL="$(opt_overflow_left)"; _RC_OVR="$(opt_overflow_right_format)"
+	_RC_JUSTIFY="$(tmux show-options -g -v status-justify 2>/dev/null)"; [ -n "$_RC_JUSTIFY" ] || _RC_JUSTIFY=left
+}
+# _RC_* — STATIC renderer config, populated once per render() by _lp_load_render_config.
+_RC_TYPE=""; _RC_FG=""; _RC_BG=""; _RC_HFG=""; _RC_HBG=""; _RC_NF=""
+_RC_ICON=""; _RC_GAP=""; _RC_TABSTYLE=""; _RC_OVL=""; _RC_OVR=""; _RC_JUSTIFY=""
+
 render() {
+	_lp_load_render_config   # STATIC config from the activation cache (1 read, not ~10)
 	local TYPE FG BG HFG HBG
 	local LIST FILTER IDX
 	local -a all=() filtered=()
@@ -55,11 +89,11 @@ render() {
 		vis_start vis_end left_ind right_ind qbw T0 vp_T th ind_w left_present new_lp ovl ovr_fmt ranked \
 		tab_style cur_tpl reg_tpl sep sep_w
 
-	TYPE="$(opt_type)"
-	FG="$(opt_fg)"
-	BG="$(opt_bg)"
-	HFG="$(opt_highlight_fg)"
-	HBG="$(opt_highlight_bg)"
+	TYPE="$_RC_TYPE"
+	FG="$_RC_FG"
+	BG="$_RC_BG"
+	HFG="$_RC_HFG"
+	HBG="$_RC_HBG"
 
 	# (§17 window-status is handled by the shared §19 engine below — the tab-style
 	#  decision picks the per-tab render strategy + separator; no separate early-return.)
@@ -76,13 +110,12 @@ render() {
 	FLEN="${#filtered[@]}"
 
 	# icon: the search glyph (U+F002) iff nerd-fonts on; else empty (raw UTF-8 bytes either way).
-	if [ "$(opt_nerd_fonts)" = "on" ]; then
-		icon="$(opt_search_icon)"
-	else
-		icon=""
-	fi
-	# gap: exactly opt_query_gap PLAIN (unstyled) spaces between the query and the tabs.
-	[[ "$(opt_query_gap)" =~ ^[0-9]+$ ]] && gap="$(printf '%*s' "$(opt_query_gap)" '')" || gap=""
+	# icon + gap come from the cached static config (_lp_load_render_config); the only
+	# remaining fork here is the printf that emits `gap` spaces (was 3 opt_query_gap
+	# round-trips; now zero).
+	icon="$_RC_ICON"
+	# gap: exactly _RC_GAP PLAIN (unstyled) spaces between the query and the tabs.
+	[[ "$_RC_GAP" =~ ^[0-9]+$ ]] && gap="$(printf '%*s' "$_RC_GAP" '')" || gap=""
 
 	# --- (c) NO-MATCH (PRD §19 §3.34): <icon><query> (no match). Plain-ASCII marker. ---
 	if [ "$FLEN" -eq 0 ]; then
@@ -103,7 +136,7 @@ render() {
 	# ws template is empty (resolution failed / not yet cached), fall back to plain (§17
 	# Fallback) so the option never breaks a setup. The §19 layout (query bar / viewport /
 	# overflow indicators / query-empty vs query-active / no-match) is IDENTICAL for both.
-	tab_style="$(opt_tab_style)"
+	tab_style="$_RC_TABSTYLE"
 	cur_tpl=""; reg_tpl=""; sep=" "; sep_w=1
 	if [ "$tab_style" = "window-status" ]; then
 		cur_tpl="$(get_state "$STATE_TAB_CURRENT_TMPL" "")"
@@ -113,7 +146,7 @@ render() {
 		else
 			sep="$(tmux show-options -gwv window-status-separator 2>/dev/null)"
 			[ -z "$sep" ] && sep=" "
-			sep_w="$(lp_disp_width "$sep")"
+			_lp_measure_into "$sep"; sep_w="$_LP_MEASURED"
 		fi
 	fi
 
@@ -134,8 +167,9 @@ render() {
 		# query_block width: icon + query + gap (query-ACTIVE only; 0 when query empty). FINDING 5.
 		qbw=0
 		if [ -n "$FILTER" ]; then
-			qbw=$(( ${#icon} + $(lp_disp_width "$FILTER") ))
-			[[ "$(opt_query_gap)" =~ ^[0-9]+$ ]] && qbw=$(( qbw + $(opt_query_gap) ))
+			_lp_measure_into "$FILTER"
+			qbw=$(( ${#icon} + _LP_MEASURED ))
+			[[ "$_RC_GAP" =~ ^[0-9]+$ ]] && qbw=$(( qbw + _RC_GAP ))
 		fi
 		T0=$(( width - qbw ))
 		# The ranked list lp_viewport measures (newline-joined filtered names).
@@ -149,15 +183,16 @@ render() {
 			vis_end=$LPV_END
 		else
 			# Overflow -> resolve the indicator circle (bounded; converges ≤2 iters; FINDING 2).
-			ovl="$(opt_overflow_left)"
-			ovr_fmt="$(opt_overflow_right_format)"
+			ovl="$_RC_OVL"
+			ovr_fmt="$_RC_OVR"
 			left_present=0
 			[ "$LPV_HIDDEN_LEFT" -gt 0 ] && left_present=1
 			while :; do
 				[ "$left_present" = 1 ] && left_ind="$ovl" || left_ind=""
 				th=$(( LPV_HIDDEN_LEFT + LPV_HIDDEN_RIGHT ))
 				right_ind="${ovr_fmt//%d/$th}"
-				ind_w=$(( $(lp_disp_width "$left_ind") + $(lp_disp_width "$right_ind") ))
+				_lp_measure_into "$left_ind"; local _lw_l="$_LP_MEASURED"
+				_lp_measure_into "$right_ind"; ind_w=$(( _lw_l + _LP_MEASURED ))
 				vp_T=$(( T0 - ind_w ))
 				lp_viewport "$ranked" "$vp_T" "$SCROLL" "$cidx" "$sep_w"
 				new_lp=0
@@ -218,11 +253,10 @@ render() {
 			printf '%s' "${left_ind}${tabs}${right_ind}"
 		else
 			# Fits -> emulate status-justify (leading padding). width already read above.
-			justify="$(tmux show-options -g -v status-justify 2>/dev/null)"
-			[ -z "$justify" ] && justify=left
+			justify="$_RC_JUSTIFY"
 			pad=""
 			if [ "$justify" != left ]; then
-				tabs_w="$(lp_disp_width "$tabs")"
+				_lp_measure_into "$tabs"; tabs_w="$_LP_MEASURED"
 				if [ "$tabs_w" -lt "$width" ]; then
 					case "$justify" in
 						centre | absolute-centre) padw=$(( (width - tabs_w) / 2 )) ;;

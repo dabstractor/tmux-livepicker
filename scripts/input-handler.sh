@@ -140,9 +140,10 @@ _lp_sync_preview_to_top_match() {
 	else
 		_top="${_sync_filtered[0]}"
 	fi
-	# Delegate redraw + (deferred | synchronous) preview to _lp_preview_follow. Empty
-	# filtered list -> _top="" -> no preview fires (leave the prior pane as-is).
-	_lp_preview_follow "$_top"
+	# Delegate the preview to _lp_preview_dispatch (the caller has ALREADY issued
+	# _lp_status_redraw so the highlight moves before this runs). Empty filtered
+	# list -> _top="" -> no preview fires (leave the prior pane as-is).
+	_lp_preview_dispatch "$_top"
 }
 
 # _lp_scroll_into_view IDX RANKED — PRD §19 §3.32: keep @livepicker-scroll tracking the
@@ -156,7 +157,7 @@ _lp_sync_preview_to_top_match() {
 # (steps a+b) and self-corrects — the highlight is ALWAYS visible regardless of STATE_SCROLL.
 # So this write is STATE hygiene (keep scroll tracking), not a render-correctness requirement.
 # Scroll is a synchronous STATE write (part of the §18 status update) — NO preview work; the
-# nav preview re-sync stays deferred via the caller's _lp_preview_follow call.
+# nav preview re-sync stays deferred via the caller's _lp_preview_dispatch call.
 _lp_scroll_into_view() {
 	local idx="${1:-0}" ranked="${2:-}"
 	local width scroll
@@ -172,7 +173,7 @@ _lp_scroll_into_view() {
 # ADVANCES pending -b jobs; bumping the seq up front means a stale fire re-checks the seq in
 # preview.sh (GUARD 2, before the unlink) and NO-OPS, regardless of how many round-trips the
 # scroll-into-view / reads add afterward. defer=off runs preview.sh INLINE (no -b job, no race)
-# -> the gate makes this a no-op. _lp_fire_preview (called later via _lp_preview_follow) bumps
+# -> the gate makes this a no-op. _lp_fire_preview (called later via _lp_preview_dispatch) bumps
 # AGAIN and captures the final seq for THIS nav's fire — the early bump is a pure invalidation
 # signal (one "spent" seq number; the seq guards compare equality, so gaps are harmless).
 # RACE-FIX for the scroll-into-view wiring (P1.M3.T2.S1 attempt 2). See research/race_fix_findings.md.
@@ -203,19 +204,31 @@ _lp_fire_preview() {
 	tmux run-shell -b "$CURRENT_DIR/preview.sh '$target' '$seq'"
 }
 
-# _lp_preview_follow TARGET — redraw the status line AND sync the preview to the
-# current selection, honoring @livepicker-preview-defer (PRD §18.1/§18.2). Used by
-# the nav branches (explicit TARGET) and by _lp_sync_preview_to_top_match (top match).
-# defer=on: refresh-client -S FIRST (synchronous, latency-priority status redraw),
-#   THEN the preview fires in the background (_lp_fire_preview does NO synchronous
-#   preview work — only state writes + a non-blocking -b launch).
-# defer=off (legacy): synchronous preview FIRST (one arg -> preview.sh guard skipped),
-#   THEN refresh-client -S — byte-for-byte the pre-§18 order.
-# Empty TARGET -> skip the preview, still redraw (leave the prior pane as-is).
-_lp_preview_follow() {
+# _lp_status_redraw — force the status line to redraw NOW. The #() renderer is
+# re-evaluated ASYNCHRONOUSLY by the server (verified: refresh-client -S returns in
+# ~4ms regardless of renderer cost — it does NOT block on it). Calling this the
+# instant the highlight/query STATE changes lets the user see the tab selection move
+# WHILE the scroll/preview tail work still runs (the renderer self-corrects the
+# viewport via lp_viewport to keep the highlight visible regardless of scroll —
+# §19/§P7). This is the snappiness lever: refresh EARLY, do the slow work behind it.
+_lp_status_redraw() {
+	tmux refresh-client -S 2>/dev/null || true
+}
+
+# _lp_preview_dispatch TARGET — sync the live preview to TARGET, honoring
+# @livepicker-preview-defer. The status redraw is the CALLER's responsibility: each
+# path issues _lp_status_redraw right after the highlight/query write (so the tab
+# selection moves first), THEN calls this for the preview. Decoupled by design
+# (PRD §18): the slow link-window/render runs detached and never blocks the UI.
+#   defer=on (default): _lp_fire_preview launches a background, supersedeable
+#     run-shell -b job (non-blocking — verified ~4ms return; the render takes its
+#     time detached). NO redraw here (the caller's early _lp_status_redraw covers it).
+#   defer=off (legacy/diagnostic): preview.sh runs INLINE; the trailing refresh
+#     preserves the pre-§18 synchronous order byte-for-byte (preview-then-redraw).
+# Empty TARGET -> no preview (leave the prior pane as-is).
+_lp_preview_dispatch() {
 	local target="${1:-}"
 	if [ "$(opt_preview_defer)" = "on" ]; then
-		tmux refresh-client -S 2>/dev/null || true
 		_lp_fire_preview "$target"
 	else
 		[ -n "$target" ] && { "$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true; }
@@ -258,6 +271,9 @@ input_main() {
 			set_state "$STATE_SCROLL" "0"
 			# Sync the live preview to the new top filtered match (PRD §3 / README;
 			# mirror next/prev). Always index 0 — these branches just reset it.
+			# REDRAW NOW (the instant the query/highlight changes) so the tab selection
+			# moves before the (deferred | sync) preview work below.
+			_lp_status_redraw
 			_lp_sync_preview_to_top_match
 			return 0
 			;;
@@ -296,6 +312,8 @@ input_main() {
 			set_state "$STATE_SCROLL" "0"
 			# Sync the live preview to the new top filtered match (PRD §3 / README;
 			# mirror next/prev). Always index 0 — these branches just reset it.
+			# REDRAW NOW (mirror type) so the highlight moves before the preview work.
+			_lp_status_redraw
 			_lp_sync_preview_to_top_match
 			return 0
 			;;
@@ -326,18 +344,23 @@ input_main() {
 			[[ "$cur_index" =~ ^[0-9]+$ ]] || cur_index=0
 			# Wrap modulo L (PRD §6 "wrapping"). No +L needed for next.
 			new_idx=$(( (cur_index + 1) % L ))
-			# Set the NEW index FIRST, resolve the target at it, THEN preview +
-			# refresh (so the highlight + the live preview agree — FINDING 5).
+			# Set the NEW index FIRST, resolve the target at it, THEN redraw + preview
+			# (so the highlight + the live preview agree — FINDING 5).
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
-			# PRD §19 §3.32: scroll the highlight into view (synchronous STATE write; no preview
-			# work — the deferred preview re-sync via _lp_preview_follow below is unchanged, §18).
+			# REDRAW NOW (the instant the highlight changes): the renderer is async and
+			# self-corrects the viewport to keep the highlight visible, so the slow
+			# scroll/preview work below runs BEHIND the redraw, not before it.
+			_lp_status_redraw
+			# PRD §19 §3.32: scroll the highlight into view (synchronous STATE write;
+			# the renderer already self-corrected for THIS redraw — this keeps
+			# @livepicker-scroll tracking for SUBSEQUENT redraws, §P7).
 			_lp_scroll_into_view "$new_idx" "$(printf '%s\n' "${filtered[@]}")"
 			# Delegate the live link/select to preview.sh (P1.M3; FINDING 9). It
 			# fires session-window-changed (suppressed by activate T4.S2) but
-			# NEVER client-session-changed (Invariant A). _lp_preview_follow redraws +
-			# (deferred | sync) preview; guard a mid-nav failure (session gone).
-			_lp_preview_follow "$target"
+			# NEVER client-session-changed (Invariant A). _lp_preview_dispatch runs
+			# the (deferred | sync) preview; guard a mid-nav failure (session gone).
+			_lp_preview_dispatch "$target"
 			return 0
 			;;
 		prev-session)
@@ -358,10 +381,13 @@ input_main() {
 			new_idx=$(( (cur_index - 1 + L) % L ))
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
-			# PRD §19 §3.32: scroll the highlight into view (synchronous STATE write; no preview
-			# work — the deferred preview re-sync via _lp_preview_follow below is unchanged, §18).
+			# REDRAW NOW (mirror next-session): the renderer is async and self-corrects
+			# the viewport, so the highlight moves before the scroll/preview tail.
+			_lp_status_redraw
+			# PRD §19 §3.32: scroll the highlight into view (synchronous STATE write;
+			# keeps @livepicker-scroll tracking for SUBSEQUENT redraws, §P7).
 			_lp_scroll_into_view "$new_idx" "$(printf '%s\n' "${filtered[@]}")"
-			_lp_preview_follow "$target"
+			_lp_preview_dispatch "$target"
 			return 0
 			;;
 		# --- P1.M6.T3.S1 seam: confirm ---
@@ -499,6 +525,8 @@ input_main() {
 				set_state "$STATE_SCROLL" "0"
 				# Sync the live preview to the new top filtered match (PRD §3 / README;
 				# mirror next/prev). Always index 0 — these branches just reset it.
+				# REDRAW NOW (mirror type) so the highlight moves before the preview work.
+				_lp_status_redraw
 				_lp_sync_preview_to_top_match
 				# LOAD-BEARING return: this is what keeps the picker OPEN. Omitting
 				# it would fall through to restore.sh cancel (the picker would tear
