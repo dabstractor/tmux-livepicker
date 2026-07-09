@@ -57,6 +57,7 @@ readonly ORIG_LAYOUT="@livepicker-orig-layout"                         # window_
 readonly ORIG_KEY_TABLE="@livepicker-orig-key-table"
 readonly ORIG_STATUS="@livepicker-orig-status"                         # status line-count value
 readonly ORIG_RENUMBER="@livepicker-orig-renumber-windows"
+readonly ORIG_WINDOW_SIZE="@livepicker-orig-window-size"                     # driver's pre-activate window-size (PRD §9/§22; frozen to manual in clip mode; SESSION-SCOPED value saved, empty=inherits global; auto-cleared by clear_all_state's grep '@livepicker-orig-')
 readonly ORIG_HOOK="@livepicker-orig-session-window-changed"           # FULL show-hooks output (multi-line)
 readonly ORIG_CLIENT_RESIZED_HOOK="@livepicker-orig-client-resized"        # FULL show-hooks output (the IDENTICAL-shape mirror of ORIG_HOOK; §P4); saved/restored by activate/restore (P1.M3.T1); auto-cleared by clear_all_state's grep '@livepicker-orig-'
 readonly ORIG_STATUS_FORMAT_INDICES="@livepicker-orig-status-format-indices"

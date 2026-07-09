@@ -507,14 +507,14 @@
       "type": "Phase",
       "id": "P3",
       "title": "Preview sizing: clip instead of reflow (PRD §22)",
-      "status": "Planned",
+      "status": "Ready",
       "description": "Independent of P1/P2 (orthogonal — touches the driver's window-size, not the layout or ranking). Adds one option (preview-fit) and one saved-state key (orig-window-size), plus a freeze in activate and a restore in restore.sh. Carries a LOAD-BEARING empirical verification requirement (§22 'Verification required') that gates the implementation.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P3.M1",
           "title": "window-size save/freeze/restore + option (gated by empirical verification)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "First confirm clip feasibility on tmux 3.6b (the load-bearing gate), then implement the window-size save (activate) / freeze-to-manual / restore (restore.sh) + the preview-fit option. The empirical verification (T1) decides whether clip is shipped as default or falls back to reflow.",
           "tasks": [
             {
@@ -546,14 +546,14 @@
               "type": "Task",
               "id": "P3.M1.T2",
               "title": "window-size save/freeze/restore + preview-fit option",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Add opt_preview_fit (clip). Add ORIG_WINDOW_SIZE to the saved-state contract. In activate, when clip, save the driver's current window-size then set-option -t driver window-size manual BEFORE the status grow. In restore STEP 4, restore the driver's window-size to ORIG_WINDOW_SIZE. reflow mode skips the freeze/restore entirely. Reconcile the §10 step-4 ordering (freeze first, then grow status).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T2.S1",
                   "title": "Add opt_preview_fit + ORIG_WINDOW_SIZE; freeze in activate; restore in restore.sh",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S1"
@@ -576,21 +576,21 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "Validation",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Integration test for the clip behavior (or the reflow fallback if clip was deemed infeasible).",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "test_preview_clip.sh — clip/restore integration suite",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Assert: on activation (clip mode) the status grows to two lines but the self-session preview's panes do not reflow (diff window_layout before/after); navigating re-links without per-nav reflow; after exit the driver's window-size is restored and panes return to natural size. If P3.M1.T1 showed reflow is forced, assert the reflow fallback path instead and document.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T1.S1",
                   "title": "Create test_preview_clip.sh (clip no-reflow, restore window-size, reflow fallback)",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M1.T2.S1"

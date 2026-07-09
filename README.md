@@ -108,6 +108,7 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-confirm-delete`       | `off`      | When `on`, prompt `y/n` before killing a session (`confirm-before`). Default `off` = immediate, sessionx-style. |
 | `@livepicker-preview-mode`         | `live`     | `live` (link-window, all panes), `snapshot` (capture-pane, active pane), or `off`.                   |
 | `@livepicker-preview-defer`        | `on`        | Defer the live preview to a background job so typing and navigation never wait on `link-window`/`select-window`; `off` restores the synchronous path for diagnosis. |
+| `@livepicker-preview-fit`          | `clip`      | `clip` freezes the preview height before the status bar grows so the panes do not reflow (the bottom row is clipped instead); `reflow` is the legacy one-row reflow. Use `reflow` if `clip` misbehaves on your tmux/terminal. |
 | `@livepicker-suppress-window-hook` | `on`       | Clear `session-window-changed` during the picker to avoid focus-resync side effects.                 |
 | `@livepicker-tab-style`            | `plain`     | `plain` (standalone `@livepicker-fg`/`bg`/`highlight-*`) or `window-status` (reuse the theme's `window-status-current-format` / `window-status-format` so picker tabs match your window tabs; falls back to `plain`). |
 | `@livepicker-fg`                   | `default`  | Picker text color.                                                                                   |
@@ -193,6 +194,19 @@ at confirm. Cancelling leaves zero trace.
   `window-size` behavior and affects only detached candidate sessions. To
   avoid this, set `@livepicker-preview-mode snapshot` (uses `capture-pane`
   and never links the window).
+
+  Two distinct effects share this `window-size` behavior:
+  - *Status-bar grow reflow* — the one-row pane reflow that fires when the
+    picker's status bar grows from one line to two on activation. The default
+    `@livepicker-preview-fit clip` addresses this: the driver window's height
+    is pinned before the grow, so the extra status line clips the bottom row
+    instead of reflowing the panes. Set `@livepicker-preview-fit reflow` to
+    restore the legacy reflow if `clip` misbehaves on your tmux/terminal.
+  - *Candidate link-time resize* — the one-time resize of a *linked candidate*
+    to the driver's dimensions described above. This persists under `clip`
+    (a linked window shares one size across every session it belongs to, so the
+    clip pin does not eliminate it). To avoid it, set
+    `@livepicker-preview-mode snapshot`.
 
 ## Compatibility
 

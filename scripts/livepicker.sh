@@ -250,7 +250,7 @@ activate_main() {
 	#       2..4->n+1, 5->5 (clamp). status-left/right/window-status-format are
 	#       LEFT UNTOUCHED (tubular owns them; Invariant C: line 2 composes from
 	#       them when status-format[1] is unset — research FINDING 5).
-	local sf_n sf_val sf_indices lp_idx orig_status
+	local sf_n sf_val sf_indices lp_idx orig_status lp_fit_pre_h lp_fit_sess lp_fit_win
 	local -a sf_desc=()
 	# (a) shift genuinely-user-set indices HIGHEST-FIRST (no-op when the saved
 	# list is empty, as in this env). sf_indices is a digit-only space-list
@@ -268,6 +268,32 @@ activate_main() {
 	# (b) install the picker renderer at the configured index (default 0).
 	lp_idx="$(opt_status_format_index)"
 	tmux set-option -g "status-format[$lp_idx]" "#($CURRENT_DIR/renderer.sh)"
+	# (b.5) P3.M1.T2.S1 — FREEZE the driver's window-size (clip mode) BEFORE the
+	# status grow (PRD §10 step 4 reordered / §22; gate = clip_verification.md §3).
+	# opt_preview_fit==clip: save the driver's window-size, then pin the active
+	# window's height so the impending status grow CANNOT reflow it (clip = tmux
+	# renders the top, clips the overflow row). MANUAL ALONE FAILS on 3.6b
+	# (clip_probe_findings cond B: reflow 23->22); the resize-window -y H0 PIN is
+	# the load-bearing step (cond C/F: byte-identical layout). ORIG_SESSION+
+	# ORIG_WINDOW were saved in STEP 2 and the active window is STILL ORIG_WINDOW
+	# here (T2 list-build switches nothing; first preview is T5, AFTER the grow).
+	if [ "$(opt_preview_fit)" = "clip" ]; then
+		lp_fit_sess="$(get_state "$ORIG_SESSION" "")"
+		lp_fit_win="$(get_state "$ORIG_WINDOW" "")"
+		# SAVE the driver's SESSION-SCOPED window-size (NOT global): empty when the
+		# driver had no override (inherits global "latest", the common case) ->
+		# restore UNSETS our override for byte-exact round-trip (PRD §15 zero-trace).
+		tmux set-option -g "$ORIG_WINDOW_SIZE" "$(tmux show-options -t "$lp_fit_sess" -v window-size 2>/dev/null || true)"
+		# capture the active window's height BEFORE any status change (the pin target).
+		lp_fit_pre_h="$(tmux display-message -p -t "$lp_fit_win" '#{window_height}' 2>/dev/null || true)"
+		# FREEZE: per-session manual (client-resized robustness), then the load-bearing
+		# height pin. NO '=' prefix on -t (set-option rejects it; show-options tolerates
+		# it — gotcha #2). NEVER -g for window-size (gotcha #3: global manual disconnects
+		# the window from the client). -t "$lp_fit_win" — the var already holds @N; do NOT
+		# prepend '@' (gotcha #4: -t "@$W" -> @@N).
+		tmux set-option -t "$lp_fit_sess" window-size manual
+		[ -n "$lp_fit_pre_h" ] && tmux resize-window -y "$lp_fit_pre_h" -t "$lp_fit_win" 2>/dev/null || true
+	fi
 	# (c) grow the status line count by one — NORMALIZED for tmux's on/off/2..5
 	# (do NOT use $((orig_status + 1)): "on" crashes under set -u and 1 is rejected).
 	orig_status="$(get_state "$ORIG_STATUS" "on")"

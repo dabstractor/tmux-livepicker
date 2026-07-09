@@ -54,7 +54,7 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout
+	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout lp_rfit_ws
 
 	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
@@ -145,6 +145,23 @@ restore_main() {
 	#   crash). -g required (T3's grow used -g; matched pair).
 	r_status="$(get_state "$ORIG_STATUS" "on")"
 	tmux set-option -g status "$r_status"
+	# P3.M1.T2.S1 — restore the driver's window-size (clip mode mirror; PRD §9
+	# step 4 / §22). AFTER the status shrink so the panes return to natural size
+	# when window-size is freed. GATED on opt_preview_fit==clip (symmetry with
+	# activate: reflow mode touched window-size not at all, so it skips here too).
+	# STEP 6's clear_all_state runs AFTER this, so ORIG_WINDOW_SIZE is still
+	# readable here; opt_preview_fit reads the live §11 config, which clear_all_state
+	# PRESERVES. Byte-exact: when the driver had NO session override (the common
+	# case) UNSET ours so the driver falls back to inheriting global (PRD §15);
+	# otherwise replay the prior session-scoped value. NO '=' prefix on -t (gotcha #2).
+	if [ "$(opt_preview_fit)" = "clip" ]; then
+		lp_rfit_ws="$(get_state "$ORIG_WINDOW_SIZE" "")"
+		if [ -n "$lp_rfit_ws" ]; then
+			tmux set-option -t "$orig_session" window-size "$lp_rfit_ws" 2>/dev/null || true
+		else
+			tmux set-option -u -t "$orig_session" window-size 2>/dev/null || true
+		fi
+	fi
 	# key-table: CORRECTION (research FINDING 3) — MUST use -g. The no-g form does
 	#   NOT take effect on show-option -gv (verified; mirrors activate T4.S1
 	#   FINDING 3, which mandated -g on the switch). Default "root" (system_context §2).
