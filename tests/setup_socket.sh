@@ -111,8 +111,12 @@ EOF
 	export PATH
 
 	# (g) Start the isolated server (bare `tmux` now resolves to the shim ->
-	#     isolated -L socket). -x 120 -y 40 = a sane fixed size for capture-pane
-	#     golden comparisons (matches the throwaway P1.M6 mocks).
+	#     isolated -L socket). The server intentionally sources the user's
+	#     ~/.tmux.conf: some tests rely on config-derived state (e.g.
+	#     test_keyrepurpose depends on the root-table C-M-Tab/C-M-BTab
+	#     swap-window bindings; test_preview_clip depends on the client's
+	#     configured terminal size). -x 120 -y 40 = a sane fixed size for
+	#     capture-pane golden comparisons (matches the throwaway P1.M6 mocks).
 	tmux new-session -d -s "$TEST_DRIVER_SESSION" -x 120 -y 40
 
 	# (h) Spawn the baseline fixtures (FINDING 8): `alpha`/`beta` detached
@@ -163,7 +167,6 @@ lp_sweep_orphans() {
 	local tmux_bin="${REAL_TMUX:-/usr/bin/tmux}"
 	local sock_dir line name sock
 	sock_dir="${TMPDIR:-/tmp}/tmux-$(id -u)"
-	local line name sock
 	# Kill orphaned servers first (so their socket files are releasable). Walk
 	# live tmux processes; match `tmux -L <lp-|livepicker-test-...>`. pgrep -af gives
 	# the full command line (avoids SC2009 ps|grep).
@@ -187,7 +190,7 @@ lp_sweep_orphans() {
 			fi
 			shift
 		done
-	done < <(pgrep -af 'tmux .* -L (lp-|livepicker-test-)' 2>/dev/null)
+	done < <(pgrep -af 'tmux -L (lp-|livepicker-test-)' 2>/dev/null)
 	# Also remove any leftover orphan socket files whose server already exited.
 	[ -d "$sock_dir" ] && find "$sock_dir" -maxdepth 1 -type s \
 		\( -name 'lp-*' -o -name 'livepicker-test-*' \) -delete 2>/dev/null || true

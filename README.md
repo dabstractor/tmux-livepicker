@@ -116,7 +116,7 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-bg`                   | `default`  | Picker background.                                                                                   |
 | `@livepicker-highlight-fg`         | `black`    | Highlighted (current) item text.                                                                     |
 | `@livepicker-highlight-bg`         | `yellow`   | Highlighted item background.                                                                         |
-| `@livepicker-status-format-index`  | `0`        | Which status line the picker takes.                                                                  |
+| `@livepicker-status-format-index`  | `0`        | Which status line the picker takes. Must be a displayed line: the status bar grows to `current + 1` lines on activation, so a value at or beyond the grown line count renders the picker invisibly. `0` (the default) is always safe. |
 | `@livepicker-nerd-fonts`            | `on`       | Opt-out for the search icon (tmux cannot detect the terminal font). `on` shows the icon; `off` shows query text only. |
 | `@livepicker-search-icon`           | `\uf002`   | The icon glyph shown before the query while typing. Default is `nf-fa-search` (U+F002); raw UTF-8 bytes in the source. |
 | `@livepicker-query-gap`             | `2`        | Spaces between the query and the first session tab while a query is active. |
