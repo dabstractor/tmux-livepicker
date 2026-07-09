@@ -166,6 +166,23 @@ _lp_scroll_into_view() {
 	set_state "$STATE_SCROLL" "$LPV_SCROLL"
 }
 
+# _lp_invalidate_pending_preview — bump STATE_PREVIEW_SEQ FIRST (defer=on only) so any in-flight
+# background preview fire (run-shell -b from a prior keystroke/nav) is marked stale BEFORE the nav
+# path performs any tmux round-trips. Each tmux round-trip pumps the server event loop, which
+# ADVANCES pending -b jobs; bumping the seq up front means a stale fire re-checks the seq in
+# preview.sh (GUARD 2, before the unlink) and NO-OPS, regardless of how many round-trips the
+# scroll-into-view / reads add afterward. defer=off runs preview.sh INLINE (no -b job, no race)
+# -> the gate makes this a no-op. _lp_fire_preview (called later via _lp_preview_follow) bumps
+# AGAIN and captures the final seq for THIS nav's fire — the early bump is a pure invalidation
+# signal (one "spent" seq number; the seq guards compare equality, so gaps are harmless).
+# RACE-FIX for the scroll-into-view wiring (P1.M3.T2.S1 attempt 2). See research/race_fix_findings.md.
+_lp_invalidate_pending_preview() {
+	[ "$(opt_preview_defer)" = "on" ] || return 0
+	local s
+	s="$(get_state "$STATE_PREVIEW_SEQ" "0")"
+	set_state "$STATE_PREVIEW_SEQ" "$(( s + 1 ))"
+}
+
 # _lp_fire_preview TARGET — schedule a background, supersedeable preview of TARGET
 # (PRD §18; external_tmux_behavior.md Q6). Bumps the monotonic STATE_PREVIEW_SEQ,
 # records STATE_PREVIEW_TARGET, then launches preview.sh detached via run-shell -b
@@ -283,6 +300,11 @@ input_main() {
 			return 0
 			;;
 		next-session)
+			# RACE FIX: invalidate any pending background preview fire FIRST, before the nav path's
+			# tmux round-trips (reads + scroll-into-view) pump the server loop and advance a stale
+			# -b fire toward its GUARD 2 mutation. _lp_fire_preview below bumps again for THIS nav's
+			# own fire. (defer=off -> no-op: inline preview.)
+			_lp_invalidate_pending_preview
 			# --- P1.M6.T2.S1: move the highlight DOWN within the FILTERED list
 			#     (wrapping), refresh the live preview + the status renderer.
 			# PRD §6 Session navigation: "next-session ... moves @livepicker-index
@@ -319,6 +341,9 @@ input_main() {
 			return 0
 			;;
 		prev-session)
+			# RACE FIX: invalidate any pending background preview fire FIRST (mirror next-session).
+			# _lp_fire_preview below bumps again for THIS nav's own fire.
+			_lp_invalidate_pending_preview
 			# --- P1.M6.T2.S1: move the highlight UP within the FILTERED list
 			#     (wrapping, reverse). Mirror of next-session.
 			cur_list="$(get_state "$STATE_LIST" "")"

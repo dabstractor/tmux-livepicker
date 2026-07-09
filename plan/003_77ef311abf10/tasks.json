@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Status-line layout & fuzzy ranking (PRD §19 + §20)",
-      "status": "Researching",
+      "status": "Complete",
       "description": "The central rework: turn the picker from a substring filter with a trailing index/total into a fuzzy-ranked, scrollable, query-bar status line. §19 (layout: query bar pinned far-left + ranked tabs in a left-to-right scroll viewport + overflow indicators, count removed) and §20 (ranking: subsequence match + score) are one phase because the layout renders the order the ranker produces, and both feed the same shared lp_rank the renderer and input-handler index into. Replaces scripts/filter.sh with scripts/rank.sh; adds scripts/layout.sh; reworks renderer.sh; wires scroll state into input paths.",
       "milestones": [
         {
@@ -226,7 +226,7 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Input flow: scroll-into-view, scroll reset, client-width cache",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Wire the scroll state into the input paths and add the client-width capture + client-resized hook to activate/restore. The client-width cache is what the renderer measures the viewport against (no per-keystroke tmux round-trip).",
           "tasks": [
             {
@@ -260,14 +260,14 @@
               "type": "Task",
               "id": "P1.M3.T2",
               "title": "Scroll-into-view on nav + scroll reset on type/backspace/cancel-clear",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Wire the scroll state into the input paths: next-session/prev-session run the layout.sh scroll-into-view rule after updating the index; type/backspace/cancel-clear reset scroll=0 alongside the existing index=0 reset. Scroll is part of the synchronous status update (still status-only; no preview work).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
                   "title": "Wire scroll state into input paths (scroll-into-view + reset)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S1",
