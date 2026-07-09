@@ -612,21 +612,21 @@
       "type": "Phase",
       "id": "P4",
       "title": "Sync changeset-level documentation (Mode B)",
-      "status": "Ready",
+      "status": "Complete",
       "description": "Depends on P1, P2, P3. Sweeps all four features into the README overview and CHANGELOG. Do NOT edit PRD.md (read-only). This is the catch-all that prevents a coherent delta from shipping with a stale README.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P4.M1",
           "title": "README + CHANGELOG changeset sync",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Fold the per-feature Mode-A doc rows/notes added throughout P1-P3 into a coherent README, and add a CHANGELOG entry for the whole changeset.",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M1.T1",
               "title": "Sync changeset-level documentation",
-              "status": "Ready",
+              "status": "Complete",
               "description": "README.md: add a Status line subsection (query bar / ranked tabs / scroll / overflow; index/total gone), a Session management note (rename C-r, delete M-BSpace, guards, caveats), update the Appearance note (§19 viewport governs window-status tabs too), reconcile the bugfix-001 limitation with §22 clip. CHANGELOG.md: add an [Unreleased] entry for all four features with defaults + invariants + escape hatches. Follow write-tech-docs style (no em dashes, no marketing tell-words).",
               "subtasks": [
                 {
@@ -661,7 +661,7 @@
                   "type": "Subtask",
                   "id": "P4.M1.T1.S2",
                   "title": "CHANGELOG.md [Unreleased] entry (4 features, defaults, invariants, escape hatches)",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T3.S1",
