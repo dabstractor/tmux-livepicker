@@ -111,28 +111,28 @@
       "type": "Phase",
       "id": "P2",
       "title": "Window-level picking: flip + confirm-on-window + window-cursor",
-      "status": "Ready",
+      "status": "Complete",
       "description": "The core feature. Adds the per-candidate window-cursor state, extends preview.sh to show a chosen window, adds the next-window/prev-window input actions, and reworks confirm to land on (session, window). Depends on P1 (the bound window-axis keys fire these actions). Invariant B is the design driver: a flip links the chosen window into the driver and selects it there, never select-window on the candidate.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P2.M1",
           "title": "Window-cursor state + preview chosen-window + flip actions",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Add the per-candidate window-cursor state keys, extend preview.sh to show a chosen window, and add the next-window/prev-window input actions with cursor resets on session-nav and type.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Window-cursor state keys",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Add four runtime state keys to state.sh and append all four to _STATE_RUNTIME_KEYS. Initialize at activate.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M1.T1.S1",
                   "title": "Add 4 window-cursor state keys to state.sh + init at activate",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See plan/004_2c5127285a90/architecture/gap_analysis_two_axis.md §'Gap (c)'. state.sh currently defines runtime keys at lines 40-52 and _STATE_RUNTIME_KEYS at line 68. None of the window-cursor keys exist. STATE_LINKED_ID (@livepicker-linked-id) tracks the linked window handle; the new STATE_PREVIEW_WIN_ID overlaps it for non-self candidates but diverges for the self-session (linked-id is empty there). Keep BOTH.\n2. INPUT: state.sh readonly constants block (lines 40-52). _STATE_RUNTIME_KEYS at line 68.\n3. LOGIC:\n   a. Add 4 new readonly constants:\n      readonly STATE_CAND_WIN_SESSION=\"@livepicker-cand-win-session\"  (cache-invalidation key: the candidate the cached list belongs to)\n      readonly STATE_CAND_WIN_LIST=\"@livepicker-cand-win-list\"  (newline-joined ordered window ids of that candidate)\n      readonly STATE_CAND_WIN_CURSOR=\"@livepicker-cand-win-cursor\"  (index into the list; defaults to the candidate's active window on entry)\n      readonly STATE_PREVIEW_WIN_ID=\"@livepicker-preview-win-id\"  (the window currently shown; overlaps STATE_LINKED_ID for non-self)\n   b. Append all 4 to _STATE_RUNTIME_KEYS so clear_all_state tears them down. The current line is:\n      readonly _STATE_RUNTIME_KEYS=\"$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH $STATE_RENDER_CACHE\"\n      Add: $STATE_CAND_WIN_SESSION $STATE_CAND_WIN_LIST $STATE_CAND_WIN_CURSOR $STATE_PREVIEW_WIN_ID\n   c. In livepicker.sh activate (after T2 list-build, around line ~280 where STATE_LIST/STATE_FILTER/STATE_INDEX are initialized), initialize the cursor: set STATE_CAND_WIN_SESSION to the current session name (from ORIG_SESSION), STATE_CAND_WIN_LIST to '' (derived lazily on first flip), STATE_CAND_WIN_CURSOR to '0' (defaults to active window), STATE_PREVIEW_WIN_ID to '' (no window shown yet). This is a no-behavior-change initialization — the cursor is read by P2.M1.T3's flip actions.\n4. OUTPUT: 4 new state keys available via get_state/set_state, cleared on teardown. Consumers: input-handler.sh (P2.M1.T3 flip/nav), preview.sh (P2.M1.T2 chosen window), confirm (P2.M2.T1 window commit).\n5. DOCS: none — internal state keys, no user-facing surface change.",
@@ -381,14 +381,14 @@
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "Pane-geometry snapshot at activate + drift-gated restore",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Capture a pane-geometry snapshot of the original window at activate. In restore.sh STEP 5, compare current geometry to the snapshot; only select-layout if it drifted. This is the §23 'prevent, never repair' stance.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T1.S1",
                   "title": "Capture pane-geometry snapshot at activate",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: livepicker.sh STEP 2 (around line 155) already captures ORIG_SESSION, ORIG_WINDOW, ORIG_LAYOUT (window_layout string). PRD §9 adds: 'plus a pane-geometry snapshot of that window (#{pane_id}/#{pane_left}/#{pane_top}/#{pane_width}/#{pane_height} per pane). The geometry snapshot is so restore can detect whether anything drifted and act only if it did.'\n2. INPUT: livepicker.sh STEP 2 state-save block. state.sh ORIG_* constants block.\n3. LOGIC:\n   a. In state.sh, add: readonly ORIG_PANE_GEOMETRY=\"@livepicker-orig-pane-geometry\" (an ORIG_* saved key, auto-cleared by clear_all_state's grep '@livepicker-orig-').\n   b. In livepicker.sh STEP 2, after the ORIG_LAYOUT capture, add:\n      tmux set-option -g \"$ORIG_PANE_GEOMETRY\" \"$(tmux list-panes -t \"$(lp_client_format '#{window_id}')\" -F '#{pane_id}:#{pane_left},#{pane_top},#{pane_width},#{pane_height}' 2>/dev/null)\"\n      This captures the original window's pane geometry at activation. Use the client-aware ORIG_WINDOW (already saved) or lp_client_format '#{window_id}' for the target.\n4. OUTPUT: ORIG_PANE_GEOMETRY populated at activate, available to restore for drift detection.\n5. DOCS: none — internal state.",
@@ -402,7 +402,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S2",
                   "title": "Drift-gated restore in restore.sh STEP 5",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M2.T1.S1"

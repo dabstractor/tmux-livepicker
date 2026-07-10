@@ -1,0 +1,119 @@
+
+==================================================================
+  Pane-Immutability Verification Probe — tmux 3.6b (PRD §23 Invariant C)
+==================================================================
+  PRP     : plan/004_2c5127285a90/P3M1T1S1/PRP.md
+  Answer  : plan/004_2c5127285a90/P3M1T1S1/research/candidate_pin_probe_findings.md
+  Harness : tests/setup_socket.sh (isolated -L socket; never the real server)
+  Real server sessions BEFORE: 16 session(s)
+
+==================================================================
+  ARM A — CONTROL (no candidate pin; reproduce clip_verification.md §4)
+==================================================================
+  ALPHA source BEFORE link:
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  ALPHA source AFTER  link:
+    height : 22
+    layout : c33d,80x22,0,0{40x22,0,0,1,39x22,41,0[39x11,41,0,7,39x10,41,12,8]}
+    panes  : %1:0,0,40,22|%7:41,0,39,11|%8:41,12,39,10
+  >> layout: DIFF
+  >> height: 40 -> 22  (DISTURBED)
+  EXPECT: DISTURBED (40 -> 22, layout changes). Reproduces clip_verification.md §4.
+
+==================================================================
+  ARM B — PIN BEFORE LINK (detached candidate; the proposed fix)
+==================================================================
+  ALPHA source BEFORE pin/link:
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  ALPHA source AFTER pin (did the pin itself change it?):
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  ALPHA source AFTER link:
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  >> layout: SAME/BYTE-IDENTICAL
+  >> panes : SAME/BYTE-IDENTICAL
+  EXPECT: BYTE-IDENTICAL (the decisive data point).
+
+==================================================================
+  ARM C — PIN AFTER LINK (reversibility of the link-time mutation)
+==================================================================
+  ALPHA source BEFORE link (unpinned):
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  ALPHA source AFTER unpinned link (DISTURBED):
+    height : 22
+    layout : c33d,80x22,0,0{40x22,0,0,1,39x22,41,0[39x11,41,0,7,39x10,41,12,8]}
+    panes  : %1:0,0,40,22|%7:41,0,39,11|%8:41,12,39,10
+  ALPHA source AFTER pin-back -y 40 (height only):
+    height : 40
+    layout : 7b79,80x40,0,0{40x40,0,0,1,39x40,41,0[39x20,41,0,7,39x19,41,21,8]}
+    panes  : %1:0,0,40,40|%7:41,0,39,20|%8:41,21,39,19
+  >> height-only -y: layout DIFF  (width NOT restored: stays at disturbed 80)
+  ALPHA source AFTER pin-back -x 120 -y 40 (both dims):
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  >> both-dim -x -y: layout SAME-restored/BYTE-IDENTICAL
+  >> both-dim -x -y: panes  SAME-restored/BYTE-IDENTICAL
+  EXPECT: height-only=DIFF (width not restored); both-dim=SAME-restored (the exact layout).
+  REFINES C2: a reliable restore needs BOTH W and H (resize-window -x W_orig -y H_orig), or height + select-layout.
+
+==================================================================
+  ARM D — FLIP (second distinct window of the candidate)
+==================================================================
+  W1 source BEFORE flip (linked, selected):
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  W1 source AFTER  flip (W2 linked + selected, then back to W1):
+    height : 40
+    layout : 16ec,120x40,0,0{60x40,0,0,1,59x40,61,0[59x20,61,0,7,59x19,61,21,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,20|%8:61,21,59,19
+  >> flip layout: SAME/safe
+  >> flip panes : SAME/safe
+  EXPECT: SAME/safe (distinct @id windows are independent shared objects; no per-nav reflow — clip §4).
+
+==================================================================
+  ARM E — CANDIDATE WITH ITS OWN CLIENT (E3 pin=HARMFUL, E4 no-pin=CLEAN)
+==================================================================
+  --- E3: WITH candidate pin ---
+  ALPHA (own client) baseline AFTER global status grow:
+    height : 22
+    layout : b17d,80x22,0,0{40x22,0,0,1,39x22,41,0[39x10,41,0,7,39x11,41,11,8]}
+    panes  : %1:0,0,40,22|%7:41,0,39,10|%8:41,11,39,11
+  ALPHA AFTER candidate pin (manual + resize-window):
+    height : 40
+    layout : 15cc,120x40,0,0{60x40,0,0,1,59x40,61,0[59x19,61,0,7,59x20,61,20,8]}
+    panes  : %1:0,0,60,40|%7:61,0,59,19|%8:61,20,59,20
+  >> pin changed alpha (vs post-grow)? YES/REVERTED  (22 -> 40)
+  EXPECT: REVERTED/HARMFUL (manual detaches the window from its client -> creation size).
+  --- E4: NO candidate pin (bare link only) ---
+  ALPHA (re-fitted) BEFORE link (no pin):
+    height : 22
+    layout : b17d,80x22,0,0{40x22,0,0,1,39x22,41,0[39x10,41,0,7,39x11,41,11,8]}
+    panes  : %1:0,0,40,22|%7:41,0,39,10|%8:41,11,39,11
+  ALPHA AFTER bare link (no pin):
+    height : 22
+    layout : b17d,80x22,0,0{40x22,0,0,1,39x22,41,0[39x10,41,0,7,39x11,41,11,8]}
+    panes  : %1:0,0,40,22|%7:41,0,39,10|%8:41,11,39,11
+  >> link effect with NO pin: NO-change/CLEAN
+  EXPECT: NO-change/CLEAN (driver is manual -> no downward pressure; alpha's own client keeps it fitted).
+  DECISION INPUT: pin must be SKIPPED for client-bearing candidates (gate on list-clients).
+
+==================================================================
+  Non-pollution check (PRD §15)
+==================================================================
+  Real server sessions AFTER: 16 session(s)
+  >> REAL SERVER UNTOUCHED (byte-identical session list)
+
+==================================================================
+  Probe complete. See architecture/pane_immutability_verification.md.
+==================================================================
