@@ -6,11 +6,15 @@
 #           defined in state.sh (sourced above); shellcheck sees no assignment here.
 # scripts/preview.sh — tmux-livepicker live preview core (link-window).
 #
-# argv[1] = candidate session name S. Links S's active window into the CURRENT
-# (driver) session and selects it, so all its panes render live below the status
-# bar — WITHOUT switching the client's session (Invariant A: select-window does
-# NOT fire client-session-changed). Tracks the linked window id in
-# @livepicker-linked-id for unlinking on the next navigation and on restore.
+# argv[1] = candidate session name S (or "session:index" token in window mode).
+# argv[2] = chosen window-id (session-mode flip target; "" for session-nav/first preview).
+# argv[3] = deferred-preview supersede seq ("" for inline calls -> seq guards skipped).
+# Links S's active window — or the chosen window (argv[2]) when supplied — into the
+# CURRENT (driver) session and selects it, so all its panes render live below the
+# status bar — WITHOUT switching the client's session (Invariant A: select-window
+# does NOT fire client-session-changed). Tracks the linked window id in
+# @livepicker-linked-id (non-self) and the logical shown window in
+# @livepicker-preview-win-id, for unlinking on the next navigation and on restore.
 #
 # SCOPE (P1.M3.T1.S1): the LIVE link/unlink/select core ONLY. The self-session
 # case here is the minimal guard (select orig + return). S2 (P1.M3.T1.S2) EXTENDS
@@ -63,8 +67,12 @@ preview_fallback() {
 	# window). Do NOT build "=$w_sess:$w_idx:." — the extra ':' makes tmux parse
 	# the index as "1:" and fail with "can't find window 1:". Returns capture's
 	# rc: 0 = captured, non-zero = gone.
-	local captured target
-	if [ "$(opt_type)" = "window" ] && [ "${1%%:*}" != "$1" ]; then
+	local captured target chosen="${2:-}"
+	if [ -n "$chosen" ]; then
+		# P2.M1.T2: session mode + flipped window -> capture THAT window's active pane.
+		# "=session:@id." is a valid target (rc=0 verified — research FINDING 3).
+		target="=$1:$chosen."
+	elif [ "$(opt_type)" = "window" ] && [ "${1%%:*}" != "$1" ]; then
 		# WINDOW mode: candidate token is "session:window_index" (livepicker.sh).
 		# Build "session:index." — the '.' attaches directly to the index (NO ':').
 		target="=${1%%:*}:${1#*:}."
@@ -78,7 +86,7 @@ preview_fallback() {
 
 # argv[1] = candidate session name S.
 preview_main() {
-	local S="${1:-}" expected_seq="${2:-}"
+	local S="${1:-}" chosen_win="${2:-}" expected_seq="${3:-}"
 	local current_session orig_window linked_id src_id w_sess w_idx cur_seq check_session
 
 	# The session we preview INSIDE (the driver). Equal to the live client session
@@ -88,7 +96,7 @@ preview_main() {
 	linked_id="$(get_state "$STATE_LINKED_ID" "")"
 
 	# --- deferred-preview supersede guard (PRD §18 / external_tmux_behavior.md Q6) ---
-	# When called WITH an expected_seq ($2 — the deferred background path from
+	# When called WITH an expected_seq ($3 — the deferred background path from
 	# P1.M2.T3's fire helper), bail EARLY if the live seq has advanced past it: a
 	# newer keystroke fired a newer preview, so THIS job is stale and must NOT touch
 	# any window. (A run-shell -b job is non-cancellable — Q5 — so it no-ops here.)
@@ -111,9 +119,11 @@ preview_main() {
 		return 0
 	fi
 	if [ "$mode" = "snapshot" ]; then
-		# Snapshot: capture-pane of S's active pane; NEVER link. Self-session
-		# needs no special handling (capturing your own pane is harmless).
-		preview_fallback "$S"
+		# Snapshot: capture-pane of S's (or the FLIPPED window's) active pane; NEVER
+		# link. chosen_win (session-mode flip) -> capture THAT window's active pane;
+		# else S's active window. Self-session needs no special handling (capturing
+		# your own pane is harmless). (PRD §7 Fallbacks; P2.M1.T2 chosen-window.)
+		preview_fallback "$S" "$chosen_win"
 		return $?
 	fi
 	# mode == live (default): fall through to the link flow below.
@@ -140,12 +150,21 @@ preview_main() {
 			tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
 			tmux_unset_opt "$STATE_LINKED_ID"
 		fi
-		# Select the target window: window mode -> the specific "session:index"
-		# ($S); session mode -> the original active window. NO link in either case.
+		# Select the target window: window mode -> the specific "session:index" ($S);
+		# session mode -> the FLIPPED window ($chosen_win, P2.M1.T2) if supplied, else
+		# ORIG_WINDOW. NO link in any case. Record STATE_PREVIEW_WIN_ID (the logical
+		# shown window — overlaps STATE_LINKED_ID for non-self, DIVERGES here: linked-id
+		# stays empty for self; preview-win-id = the driver window now shown). Flipping
+		# the driver's own windows while browsing moves its active window; cancel's hard
+		# reset to ORIG_WINDOW (restore STEP 2) undoes it. (PRD §7 self-session; §3.6.)
 		if [ "$(opt_type)" = "window" ]; then
 			tmux select-window -t "$S" 2>/dev/null || true
+		elif [ -n "$chosen_win" ]; then
+			tmux select-window -t "$chosen_win" 2>/dev/null || true
+			set_state "$STATE_PREVIEW_WIN_ID" "$chosen_win"
 		else
 			[ -n "$orig_window" ] && tmux select-window -t "$orig_window" 2>/dev/null || true
+			[ -n "$orig_window" ] && set_state "$STATE_PREVIEW_WIN_ID" "$orig_window"
 		fi
 		return 0
 	fi
@@ -162,6 +181,12 @@ preview_main() {
 		w_sess="${S%%:*}"
 		w_idx="${S#*:}"
 		src_id="$(tmux list-windows -t "=$w_sess" -F '#{window_id}:#{window_index}' 2>/dev/null | awk -F: -v idx="$w_idx" '$2==idx {print $1; exit}')"
+	elif [ -n "$chosen_win" ]; then
+		# P2.M1.T2: session mode + a FLIPPED window — use the supplied window-id
+		# directly (skip the active-window lookup). chosen_win is a server-global @id
+		# (select-window -t "@id" verified — research FINDING 2). Only session mode
+		# supplies chosen_win; window mode is handled by the branch above.
+		src_id="$chosen_win"
 	else
 		src_id="$(tmux list-windows -t "=$S" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
 	fi
@@ -185,6 +210,7 @@ preview_main() {
 		| grep -Fxq "$src_id"; then
 		tmux select-window -t "$src_id" 2>/dev/null || true
 		set_state "$STATE_LINKED_ID" "$src_id"
+		set_state "$STATE_PREVIEW_WIN_ID" "$src_id"   # P2.M1.T2: logical shown window (== LINKED_ID non-self)
 		return 0
 	fi
 
@@ -255,8 +281,11 @@ preview_main() {
 		[ "$(get_state "$STATE_PREVIEW_SEQ" "0")" != "$expected_seq" ] && return 0
 	fi
 
-	# Track the linked id (handle for the next unlink + for restore P1.M5).
+	# Track the linked id (handle for the next unlink + for restore P1.M5) AND the
+	# logical shown window (P2.M1.T2: STATE_PREVIEW_WIN_ID overlaps STATE_LINKED_ID
+	# for non-self candidates; both = src_id here).
 	set_state "$STATE_LINKED_ID" "$src_id"
+	set_state "$STATE_PREVIEW_WIN_ID" "$src_id"
 	return 0
 }
 

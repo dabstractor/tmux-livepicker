@@ -192,16 +192,18 @@ _lp_invalidate_pending_preview() {
 # current link (and clear_all_state unsets the seq on teardown -> a post-teardown
 # job reads "0" != its seq -> no-op). No-op on an empty TARGET (no top match).
 _lp_fire_preview() {
-	local target="${1:-}" seq
+	local target="${1:-}" win_id="${2:-}" seq
 	[ -z "$target" ] && return 0
 	seq="$(get_state "$STATE_PREVIEW_SEQ" "0")"
 	seq=$(( seq + 1 ))
 	set_state "$STATE_PREVIEW_SEQ" "$seq"
 	set_state "$STATE_PREVIEW_TARGET" "$target"
 	# Absolute path (the server's cwd is NOT the plugin dir); bash shebang honored
-	# under run-shell (Q5). Single-quote the target so session names with spaces
-	# survive (matches the key-binding run-shell form, livepicker.sh:326).
-	tmux run-shell -b "$CURRENT_DIR/preview.sh '$target' '$seq'"
+	# under run-shell (Q5). Single-quote each arg so session names with spaces
+	# survive. THREE positional args now (P2.M1.T2): $1=session, $2=chosen window-id
+	# (empty for session-nav -> preview.sh chosen_win="" -> chosen-win branches
+	# skipped, byte-identical session-nav), $3=seq. (run-shell form: livepicker.sh.)
+	tmux run-shell -b "$CURRENT_DIR/preview.sh '$target' '$win_id' '$seq'"
 }
 
 # _lp_status_redraw — force the status line to redraw NOW. The #() renderer is
@@ -227,11 +229,13 @@ _lp_status_redraw() {
 #     preserves the pre-§18 synchronous order byte-for-byte (preview-then-redraw).
 # Empty TARGET -> no preview (leave the prior pane as-is).
 _lp_preview_dispatch() {
-	local target="${1:-}"
+	local target="${1:-}" win_id="${2:-}"
 	if [ "$(opt_preview_defer)" = "on" ]; then
-		_lp_fire_preview "$target"
+		_lp_fire_preview "$target" "$win_id"
 	else
-		[ -n "$target" ] && { "$CURRENT_DIR/preview.sh" "$target" 2>/dev/null || true; }
+		# Inline (defer=off): pass target + win_id (no seq -> preview.sh seq guards
+		# skipped, as before). win_id empty for session-nav -> chosen_win="" -> unchanged.
+		[ -n "$target" ] && { "$CURRENT_DIR/preview.sh" "$target" "$win_id" 2>/dev/null || true; }
 		tmux refresh-client -S 2>/dev/null || true
 	fi
 }

@@ -50,6 +50,10 @@ readonly STATE_PREVIEW_TARGET="@livepicker-preview-target"  # latest session/win
 readonly STATE_SCROLL="@livepicker-scroll"            # viewport scroll offset (PRD §19 §3.32): written by input-handler scroll-into-view/reset (P1.M3.T2); read by the renderer viewport slice; init 0 at activate (P1.M3.T1); cleared via _STATE_RUNTIME_KEYS
 readonly STATE_CLIENT_WIDTH="@livepicker-client-width"  # invoking-client width cache (PRD §10 §3.35): captured at activate (P1.M3.T1) via display-message -p '#{client_width}', refreshed by the client-resized hook; the renderer measures the viewport against this (no per-keystroke tmux round-trip, §18); cleared via _STATE_RUNTIME_KEYS
 readonly STATE_RENDER_CACHE="@livepicker-render-cache"  # renderer STATIC-config blob (newline-separated, fixed field order): baked ONCE at activate (scripts/livepicker.sh::_lp_build_render_cache) so the per-redraw renderer reads ONE option instead of ~10 round-trips that each fork a tmux client (~3-4ms each — the dominant renderer cost). The renderer (scripts/renderer.sh::_lp_load_render_config) reads it once and falls back to fresh per-option reads if absent/partial, so a missing/stale cache never breaks rendering. Static config never changes during a picker session (same assumption the §17 tab-template cache already relies on). Cleared via _STATE_RUNTIME_KEYS
+readonly STATE_CAND_WIN_SESSION="@livepicker-cand-win-session"  # cache-invalidation key: the candidate session the cached window-list belongs to (PRD §9; read by P2.M1.T3 flip actions to decide whether to re-derive the list); init = current session at activate; cleared via _STATE_RUNTIME_KEYS
+readonly STATE_CAND_WIN_LIST="@livepicker-cand-win-list"        # newline-joined ordered window ids of STATE_CAND_WIN_SESSION's candidate; derived lazily on first window flip (P2.M1.T3); init '' at activate; cleared via _STATE_RUNTIME_KEYS
+readonly STATE_CAND_WIN_CURSOR="@livepicker-cand-win-cursor"    # 0-based index into STATE_CAND_WIN_LIST; defaults to the candidate's ACTIVE window on entry (PRD §9); advanced/wrapped by P2.M1.T3 next/prev-window; init '0' at activate; cleared via _STATE_RUNTIME_KEYS
+readonly STATE_PREVIEW_WIN_ID="@livepicker-preview-win-id"      # the window currently shown; OVERLAPS STATE_LINKED_ID for non-self candidates, DIVERGES for the self-session (linked-id empty there); set by P2.M1.T2 preview; init '' at activate; cleared via _STATE_RUNTIME_KEYS
 
 # --- saved-state CONTRACT keys (PRD §9; written by activate, read by restore) ---
 readonly ORIG_SESSION="@livepicker-orig-session"
@@ -65,7 +69,7 @@ readonly ORIG_STATUS_FORMAT_INDICES="@livepicker-orig-status-format-indices"
 readonly ORIG_STATUS_FORMAT_PREFIX="@livepicker-orig-status-format-"   # +N suffix (bracket-free)
 
 # keys clear_all_state unsets explicitly (STATE_TYPE deliberately absent: it is config)
-readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH $STATE_RENDER_CACHE"
+readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH $STATE_RENDER_CACHE $STATE_CAND_WIN_SESSION $STATE_CAND_WIN_LIST $STATE_CAND_WIN_CURSOR $STATE_PREVIEW_WIN_ID"
 
 # $1: STATE_* key, $2: value. Writes a runtime @livepicker-* option (delegates to
 # utils tmux_set_opt). Caller passes a STATE_* constant, not a raw string.

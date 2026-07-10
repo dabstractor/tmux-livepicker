@@ -237,6 +237,18 @@ activate_main() {
 	set_state "$STATE_LIST" "$list"
 	set_state "$STATE_FILTER" ""
 	set_state "$STATE_INDEX" "$idx"
+	# --- P2.M1.T1.S1: window-cursor state keys init (PRD §9 runtime-state / §8 window axis). No
+	# behavior change — the keys are read by P2.M1.T2 (preview chosen window) + P2.M1.T3
+	# (next/prev-window flip), both inert until then. CAND_WIN_SESSION = the session the
+	# cached window-list belongs to (cache-invalidation key; init = current session, matching
+	# the initial highlight at $idx). LIST = '' (derived lazily on first flip). CURSOR = '0'
+	# (defaults to the candidate's active window on entry). PREVIEW_WIN_ID = '' (no window
+	# shown yet; overlaps STATE_LINKED_ID for non-self, diverges for self). Use ORIG_SESSION
+	# (NOT the `current` var, which is a session:window token in window mode) for the name.
+	set_state "$STATE_CAND_WIN_SESSION" "$(get_state "$ORIG_SESSION" "")"
+	set_state "$STATE_CAND_WIN_LIST" ""
+	set_state "$STATE_CAND_WIN_CURSOR" "0"
+	set_state "$STATE_PREVIEW_WIN_ID" ""
 	# --- T2b (P1.M3.T1.S1): client-width cache + client-resized hook (PRD §10 step 5 / §3.35).
 	# Capture the invoking client's width into @livepicker-client-width so the §19 renderer
 	# measures the viewport with NO per-keystroke tmux round-trip (§18 budget; width=0 ->
