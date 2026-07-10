@@ -143,7 +143,11 @@ _lp_sync_preview_to_top_match() {
 	# Delegate the preview to _lp_preview_dispatch (the caller has ALREADY issued
 	# _lp_status_redraw so the highlight moves before this runs). Empty filtered
 	# list -> _top="" -> no preview fires (leave the prior pane as-is).
-	_lp_preview_dispatch "$_top"
+	# P2.M1.T3.S2: pass '' as the window-id explicitly. The top match (index 0) is
+	# previewed on its OWN active window (PRD §3.4/§3.5). win_id="" -> preview.sh
+	# chosen_win="" -> it resolves the candidate's active window (the "preview
+	# follows the top match" behavior). Making it explicit documents the intent.
+	_lp_preview_dispatch "$_top" ""
 }
 
 # _lp_scroll_into_view IDX RANKED — PRD §19 §3.32: keep @livepicker-scroll tracking the
@@ -270,6 +274,14 @@ input_main() {
 			# now ALSO follows the top match (PRD §3 story 3 / README "the preview
 			# follows live") via _lp_sync_preview_to_top_match, mirroring nav.
 			set_state "$STATE_INDEX" "0"
+			# Invalidate the cached window list so the next window-flip re-derives it for the
+			# (possibly new) top match (PRD §3.4 / P2.M1.T3.S2). The top match (index 0) is
+			# re-previewed on its OWN active window by _lp_sync_preview_to_top_match below
+			# (which passes '' as the window-id -> preview.sh defaults to active — PRD §3.5).
+			# Per-candidate flip history is NOT remembered across filter changes (Invariant B).
+			set_state "$STATE_CAND_WIN_SESSION" ""
+			set_state "$STATE_CAND_WIN_LIST" ""
+			set_state "$STATE_CAND_WIN_CURSOR" "0"
 			# Reset the viewport scroll to the top (PRD §19 §3.32). A status-only STATE write
 			# (part of the synchronous status update; NO preview work — §18).
 			set_state "$STATE_SCROLL" "0"
@@ -311,6 +323,13 @@ input_main() {
 			# Reset the highlight to the top filtered match (PRD §6). Always
 			# safe — the renderer clamps + handles FLEN=0 itself.
 			set_state "$STATE_INDEX" "0"
+			# Invalidate the cached window list so the next window-flip re-derives it for the
+			# (possibly new) top match (PRD §3.4 / P2.M1.T3.S2). The top match (index 0) is
+			# re-previewed on its OWN active window by _lp_sync_preview_to_top_match below
+			# (passes '' window-id -> preview.sh defaults to active — PRD §3.5; Invariant B).
+			set_state "$STATE_CAND_WIN_SESSION" ""
+			set_state "$STATE_CAND_WIN_LIST" ""
+			set_state "$STATE_CAND_WIN_CURSOR" "0"
 			# Reset the viewport scroll to the top (PRD §19 §3.32). A status-only STATE write
 			# (part of the synchronous status update; NO preview work — §18).
 			set_state "$STATE_SCROLL" "0"
@@ -352,6 +371,15 @@ input_main() {
 			# (so the highlight + the live preview agree — FINDING 5).
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
+			# Reset the window cursor for the new candidate (PRD §3.5 / Invariant B / P2.M1.T3.S2):
+			# every candidate starts previewed on its OWN active window; per-candidate flip history
+			# is NOT remembered across session moves. Bind SESSION to the new target + invalidate the
+			# cached list (CURSOR='0' is the lazy default; the next window-flip re-derives the list
+			# and resets the cursor to the candidate's active window). The _lp_preview_dispatch
+			# below passes the SESSION only (no win_id) so preview.sh shows the candidate's active window.
+			set_state "$STATE_CAND_WIN_SESSION" "$target"
+			set_state "$STATE_CAND_WIN_LIST" ""
+			set_state "$STATE_CAND_WIN_CURSOR" "0"
 			# REDRAW NOW (the instant the highlight changes): the renderer is async and
 			# self-corrects the viewport to keep the highlight visible, so the slow
 			# scroll/preview work below runs BEHIND the redraw, not before it.
@@ -385,6 +413,11 @@ input_main() {
 			new_idx=$(( (cur_index - 1 + L) % L ))
 			set_state "$STATE_INDEX" "$new_idx"
 			target="${filtered[$new_idx]}"
+			# Reset the window cursor for the new candidate (PRD §3.5 / Invariant B / P2.M1.T3.S2):
+			# mirror next-session — bind SESSION to the new target + invalidate the cached list.
+			set_state "$STATE_CAND_WIN_SESSION" "$target"
+			set_state "$STATE_CAND_WIN_LIST" ""
+			set_state "$STATE_CAND_WIN_CURSOR" "0"
 			# REDRAW NOW (mirror next-session): the renderer is async and self-corrects
 			# the viewport, so the highlight moves before the scroll/preview tail.
 			_lp_status_redraw
@@ -636,6 +669,13 @@ input_main() {
 				# safe — the renderer clamps + handles FLEN=0 (empty filter matches
 				# ALL names; renderer FINDING 4 / rank.sh).
 				set_state "$STATE_INDEX" "0"
+				# Invalidate the cached window list so the next window-flip re-derives it for the
+				# (possibly new) top match (PRD §3.4 / P2.M1.T3.S2). The top match (index 0) is
+				# re-previewed on its OWN active window by _lp_sync_preview_to_top_match below
+				# (passes '' window-id -> preview.sh defaults to active — PRD §3.5; Invariant B).
+				set_state "$STATE_CAND_WIN_SESSION" ""
+				set_state "$STATE_CAND_WIN_LIST" ""
+				set_state "$STATE_CAND_WIN_CURSOR" "0"
 				# Reset the viewport scroll to the top (PRD §19 §3.32). A status-only STATE write
 				# (part of the synchronous status update; NO preview work — §18).
 				set_state "$STATE_SCROLL" "0"
