@@ -158,13 +158,19 @@ Line 1 of the status bar is the picker. Its layout is the same for both `plain` 
    preview of the highlighted candidate below.
 2. **Filter:** type to filter; matching is fuzzy and ranked best-first
    (see [Status line](#status-line)). `BSpace` removes a character.
-3. **Navigate:** `C-M-Tab` / `C-M-BTab` or `Down` / `Up` move the
-   selection; the preview follows live.
-4. **Confirm:** `Enter` lands on the selection, or creates a session from
+3. **Navigate sessions:** `Down` / `Up` (or your `@livepicker-session-next-keys` /
+   `-session-prev-keys`) move the selection between candidates; the preview
+   follows live.
+4. **Flip windows:** while previewing a session, your window-nav keys
+   (`@livepicker-window-next-keys` / `-window-prev-keys`, discovered from your
+   own `next-window` / `previous-window` bindings) flip its windows live. Line
+   2's window-status follows the flip. The session's own active window is
+   untouched — you are only looking.
+5. **Confirm:** `Enter` lands on the selection, or creates a session from
    your query in `session` mode with no match.
-5. **Cancel:** `Escape` clears the query if non-empty, otherwise cancels and
+6. **Cancel:** `Escape` clears the query if non-empty, otherwise cancels and
    restores everything exactly.
-6. **Rename / delete:** `C-r` renames the highlighted session; `M-BSpace`
+7. **Rename / delete:** `C-r` renames the highlighted session; `M-BSpace`
    kills it. See [Session management](#session-management).
 
 - With [tubular](https://github.com/danutatubu/tubular-tmux), the prefix is `None` and `C-Space` enters the prefix table, so the activate sequence is `C-Space` → `Space`.

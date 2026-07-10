@@ -118,7 +118,7 @@
           "type": "Milestone",
           "id": "P2.M1",
           "title": "Window-cursor state + preview chosen-window + flip actions",
-          "status": "Researching",
+          "status": "Ready",
           "description": "Add the per-candidate window-cursor state keys, extend preview.sh to show a chosen window, and add the next-window/prev-window input actions with cursor resets on session-nav and type.",
           "tasks": [
             {
@@ -177,14 +177,14 @@
               "type": "Task",
               "id": "P2.M1.T3",
               "title": "next-window / prev-window input actions + cursor resets",
-              "status": "Researching",
+              "status": "Ready",
               "description": "Add next-window)/prev-window) case branches to input-handler.sh that lazily derive the candidate's window list, advance the cursor, and defer a re-link. Also reset the window-cursor when session-nav moves to a new candidate or when type/backspace changes the top match.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M1.T3.S1",
                   "title": "Add next-window / prev-window input actions",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S1",
@@ -205,7 +205,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T3.S2",
                   "title": "Reset window-cursor on session-nav and type/backspace",
-                  "status": "Researching",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T3.S1"

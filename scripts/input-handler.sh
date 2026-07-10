@@ -394,6 +394,118 @@ input_main() {
 			_lp_preview_dispatch "$target"
 			return 0
 			;;
+		# --- P2.M1.T3.S1: window-flip actions (PRD §3.6). Flip THROUGH the windows of the
+		#     highlighted session S (advance @livepicker-cand-win-cursor, wrapping) and re-link
+		#     the chosen window via preview.sh (P2.M1.T2 chosen-window). Mirror session-nav's
+		#     shape: invalidate -> resolve S -> (lazy derive list) -> advance cursor -> redraw
+		#     -> dispatch. NEVER select-window on the candidate, NEVER switch-client (Invariant
+		#     A/B). Line 1 (session tabs) unchanged; only line 2's window-status follows the flip.
+		#     NO scroll-into-view here (scroll is the SESSION-tab viewport — line 1, unchanged).
+		#     The flip is deferred/supersedeable via the existing seq mechanism (§18).
+		next-window)
+			# RACE FIX: invalidate any pending background preview fire FIRST (mirror session-nav).
+			_lp_invalidate_pending_preview
+			# Resolve the HIGHLIGHTED session S the SAME way next/prev-session do: re-rank via the
+			# shared lp_rank (so filtered[index] == the session the renderer is highlighting).
+			cur_list="$(get_state "$STATE_LIST" "")"
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			mapfile -t filtered < <(lp_rank "$cur_list" "$cur_filter")
+			L="${#filtered[@]}"
+			[ "$L" -eq 0 ] && return 0
+			cur_index="$(get_state "$STATE_INDEX" "0")"
+			[[ "$cur_index" =~ ^[0-9]+$ ]] || cur_index=0
+			[ "$cur_index" -ge "$L" ] && cur_index=$(( L - 1 ))
+			local S="${filtered[$cur_index]}"
+			# LAZILY derive the candidate's window list when the cache is stale (belongs to a
+			# different session, or never built). PRD §3.6: the list is the FULL ordered window list
+			# (list-windows -t "=$S" -F '#{window_id}', NO -f filter), re-derived when the candidate
+			# changes. On (re)derivation, reset the cursor to the candidate's ACTIVE window so every
+			# candidate starts previewed on its own active window (Invariant B). (P2.M1.T3.S2 also
+			# resets the cursor on session-nav/type/backspace; this lazy path keeps the flip correct
+			# independently — defense in depth.)
+			local cand_win_sess win_list
+			cand_win_sess="$(get_state "$STATE_CAND_WIN_SESSION" "")"
+			win_list="$(get_state "$STATE_CAND_WIN_LIST" "")"
+			if [ "$cand_win_sess" != "$S" ] || [ -z "$win_list" ]; then
+				win_list="$(tmux list-windows -t "=$S" -F '#{window_id}' 2>/dev/null)"
+				set_state "$STATE_CAND_WIN_SESSION" "$S"
+				set_state "$STATE_CAND_WIN_LIST" "$win_list"
+				# Reset the cursor to the candidate's ACTIVE window: 0-based index of the window
+				# whose #{window_active}==1 in the SAME ordered list (research FINDING 1 — awk NR-1;
+				# the contract's grep|cut yields the @id, NOT the index). tmux always has exactly one
+				# active window; default 0 if absent (defensive — FINDING 1).
+				local active_idx
+				active_idx="$(tmux list-windows -t "=$S" -F '#{window_id}:#{window_active}' 2>/dev/null | awk -F: '$2==1{print NR-1; exit}')"
+				[[ "$active_idx" =~ ^[0-9]+$ ]] || active_idx=0
+				set_state "$STATE_CAND_WIN_CURSOR" "$active_idx"
+			fi
+			# Read the cached list into an array; advance the cursor (wrapping). PRD §3.6.
+			local -a win_arr=()
+			mapfile -t win_arr < <(printf '%s\n' "$win_list")
+			local wlen
+			wlen="${#win_arr[@]}"
+			[ "$wlen" -eq 0 ] && return 0
+			local cur_cursor new_cursor
+			cur_cursor="$(get_state "$STATE_CAND_WIN_CURSOR" "0")"
+			[[ "$cur_cursor" =~ ^[0-9]+$ ]] || cur_cursor=0
+			new_cursor=$(( (cur_cursor + 1) % wlen ))
+			set_state "$STATE_CAND_WIN_CURSOR" "$new_cursor"
+			local W="${win_arr[$new_cursor]}"
+			# Synchronous shown-window track (the deferred preview confirms it via preview.sh's
+			# STATE_PREVIEW_WIN_ID write — P2.M1.T2; redundant-but-safe so line 2's redraw reflects
+			# the new window even before the background link completes — FINDING 8).
+			set_state "$STATE_PREVIEW_WIN_ID" "$W"
+			# Line 2's window-status follows the flip (refresh -S); line 1 (session tabs) unchanged.
+			_lp_status_redraw
+			# Delegate the live link/select to preview.sh (P2.M1.T2 chosen-window). It links W into
+			# the DRIVER and selects it there — never select-window on the candidate, never
+			# switch-client. Deferred/supersedeable via seq. _lp_preview_dispatch takes (TARGET, WIN_ID).
+			_lp_preview_dispatch "$S" "$W"
+			return 0
+			;;
+		prev-window)
+			# Mirror of next-window (PRD §3.6): cursor = (cursor - 1 + len) % len (wrapping, reverse).
+			# Same invalidate -> resolve S -> lazy-derive -> redraw -> dispatch shape; only the
+			# cursor arithmetic differs. See next-window above for the full rationale comments.
+			_lp_invalidate_pending_preview
+			cur_list="$(get_state "$STATE_LIST" "")"
+			cur_filter="$(get_state "$STATE_FILTER" "")"
+			mapfile -t filtered < <(lp_rank "$cur_list" "$cur_filter")
+			L="${#filtered[@]}"
+			[ "$L" -eq 0 ] && return 0
+			cur_index="$(get_state "$STATE_INDEX" "0")"
+			[[ "$cur_index" =~ ^[0-9]+$ ]] || cur_index=0
+			[ "$cur_index" -ge "$L" ] && cur_index=$(( L - 1 ))
+			local S="${filtered[$cur_index]}"
+			local cand_win_sess win_list
+			cand_win_sess="$(get_state "$STATE_CAND_WIN_SESSION" "")"
+			win_list="$(get_state "$STATE_CAND_WIN_LIST" "")"
+			if [ "$cand_win_sess" != "$S" ] || [ -z "$win_list" ]; then
+				win_list="$(tmux list-windows -t "=$S" -F '#{window_id}' 2>/dev/null)"
+				set_state "$STATE_CAND_WIN_SESSION" "$S"
+				set_state "$STATE_CAND_WIN_LIST" "$win_list"
+				local active_idx
+				active_idx="$(tmux list-windows -t "=$S" -F '#{window_id}:#{window_active}' 2>/dev/null | awk -F: '$2==1{print NR-1; exit}')"
+				[[ "$active_idx" =~ ^[0-9]+$ ]] || active_idx=0
+				set_state "$STATE_CAND_WIN_CURSOR" "$active_idx"
+			fi
+			local -a win_arr=()
+			mapfile -t win_arr < <(printf '%s\n' "$win_list")
+			local wlen
+			wlen="${#win_arr[@]}"
+			[ "$wlen" -eq 0 ] && return 0
+			local cur_cursor new_cursor
+			cur_cursor="$(get_state "$STATE_CAND_WIN_CURSOR" "0")"
+			[[ "$cur_cursor" =~ ^[0-9]+$ ]] || cur_cursor=0
+			# The +wlen dodges bash's negative-modulo quirk (mirror prev-session's +L).
+			new_cursor=$(( (cur_cursor - 1 + wlen) % wlen ))
+			set_state "$STATE_CAND_WIN_CURSOR" "$new_cursor"
+			local W="${win_arr[$new_cursor]}"
+			set_state "$STATE_PREVIEW_WIN_ID" "$W"
+			_lp_status_redraw
+			_lp_preview_dispatch "$S" "$W"
+			return 0
+			;;
 		# --- P1.M6.T3.S1 seam: confirm ---
 		# Resolve the target from the filtered list at @livepicker-index. If a
 		# target exists: switch-client -t "=target" (the ONE switch). If empty +
