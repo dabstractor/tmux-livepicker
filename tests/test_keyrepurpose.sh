@@ -2,11 +2,12 @@
 # tests/test_keyrepurpose.sh — tmux-livepicker PRD §15.20 Key repurpose validation (P1.M7.T6.S1).
 #
 # SOURCED by run.sh (NEVER executed directly). Defines two test_* functions that drive the
-# COMPLETE real plugin DIRECTLY against the socket-isolated server and assert PRD §15.20:
-# during the picker C-M-Tab/C-M-BTab move SESSIONS (they are bound in the livepicker table to
-# input-handler next-session/prev-session), and after exit they move WINDOWS again (the root-
-# table bindings are byte-identical to before — never mutated — and key-table reverts to root).
-# Each test attaches a client, exercises one bullet, and signals pass/fail via fail/assert_*.
+# COMPLETE real plugin DIRECTLY against the socket-isolated server and assert PRD §8/§15.24:
+# during the picker C-M-Tab/C-M-BTab move WINDOWS (window axis — discovered window-nav keys,
+# bound in the livepicker table to input-handler next-window/prev-window), and after exit they
+# move WINDOWS again (the root-table bindings are byte-identical to before — never mutated —
+# and key-table reverts to root). Each test attaches a client, exercises one bullet, and
+# signals pass/fail via fail/assert_*.
 #
 # CONTRACT: (same as test_restore.sh — SOURCED by run.sh; NO side effects on source; NO
 # setup_test/teardown_test; attach_test_client FIRST; $LIVEPICKER_SCRIPTS/$TEST_DRIVER_SESSION/
@@ -18,15 +19,15 @@
 #   bind-key -T root C-M-BTab swap-window -t -1 \; select-window -t -1
 # CRITICAL (research FINDING 5): the root binding is NEVER mutated (INVARIANT B — activate only
 # COPIES prefix+root into livepicker); the revert is free because key-table returns to root.
-#   during: list-keys -T livepicker C-M-Tab -> run-shell "<abs>/input-handler.sh next-session"
+#   during: list-keys -T livepicker C-M-Tab -> run-shell "<abs>/input-handler.sh next-window"
 #   after:   list-keys -T root C-M-Tab      -> swap-window -t +1 \; select-window -t +1  (byte-identical)
 # CRITICAL (research FINDING 7): attach_test_client FIRST.
 #
 # `set -u` is INHERITED from helpers.sh (do NOT re-declare; mirror test_self.sh).
 # shellcheck disable=SC2154,SC2016,SC2034,SC2086
 
-# test_keyrepurpose_during_picker — PRD §15.20 bullet 1: while the picker is active, C-M-Tab /
-# C-M-BTab are repurposed to session navigation in the livepicker table.
+# test_keyrepurpose_during_picker — PRD §8/§15.24 bullet 1: while the picker is active,
+# C-M-Tab / C-M-BTab are bound to window navigation (discovered window axis) in the livepicker table.
 test_keyrepurpose_during_picker() {
 	attach_test_client
 	local next_bind prev_bind
@@ -38,11 +39,12 @@ test_keyrepurpose_during_picker() {
 	next_bind="$(tmux list-keys -T livepicker C-M-Tab 2>/dev/null || true)"
 	prev_bind="$(tmux list-keys -T livepicker C-M-BTab 2>/dev/null || true)"
 
-	# PRD §15.20 b1: during the picker, C-M-Tab/C-M-BTab move SESSIONS (FINDING 5).
-	assert_contains "$next_bind" "next-session" \
-		"C-M-Tab repurposed to next-session in the livepicker table"
-	assert_contains "$prev_bind" "prev-session" \
-		"C-M-BTab repurposed to prev-session in the livepicker table"
+	# PRD §8/§15.24: during the picker, C-M-Tab/C-M-BTab are WINDOW-axis keys (discovered
+	# from the user's swap-window \; select-window root bindings) -> next-window/prev-window.
+	assert_contains "$next_bind" "next-window" \
+		"C-M-Tab bound to next-window (window axis) in the livepicker table"
+	assert_contains "$prev_bind" "prev-window" \
+		"C-M-BTab bound to prev-window (window axis) in the livepicker table"
 	assert_eq "$(tmux show-option -gqv key-table)" "livepicker" \
 		"key-table is livepicker during the picker"
 

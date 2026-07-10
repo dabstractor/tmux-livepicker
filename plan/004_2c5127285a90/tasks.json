@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Two-axis key subsystem (discovery + options + binding)",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Replace the repurposed single-axis key model (window-nav keys → session-nav) with two discovered navigation axes: a window axis (discovered window-nav keys flip the previewed session's windows) and a session axis (discovered switch-client -n/-p keys + arrows move between sessions). Both axes are discovered from the user's live key tables. The new bindings are inert until P2 implements the preview/flip/confirm actions.",
       "milestones": [
         {
@@ -71,21 +71,21 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Activate binding rework (T4)",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Rework the activate T4 key-binding block to discover and bind two axes instead of repurposing window-nav keys into session-nav. Window-axis keys → next-window/prev-window; session-axis keys → next-session/prev-session. Bind in the PRD §8 order: copy → typing → window axis → session axis → confirm/cancel/backspace → rename/delete.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Rework activate T4 to bind two axes (discovered)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "In livepicker.sh activate_main, before the copy block, resolve each axis's keys into local vars (explicit option if set non-empty, else lp_discover_axis_keys). Replace the old single-axis nav binding loops with two-axis binding: window-axis keys → next-window/prev-window; session-axis keys → next-session/prev-session. Remove the 'Discovery intentionally OMITTED' comment at line 355. The new bindings are inert until P2 implements the actions (next-window/prev-window hit the * no-op branch).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Resolve axis keys + rework T4 binding blocks in livepicker.sh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1",
@@ -125,14 +125,14 @@
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Window-cursor state keys",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add four runtime state keys to state.sh and append all four to _STATE_RUNTIME_KEYS. Initialize at activate.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M1.T1.S1",
                   "title": "Add 4 window-cursor state keys to state.sh + init at activate",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See plan/004_2c5127285a90/architecture/gap_analysis_two_axis.md §'Gap (c)'. state.sh currently defines runtime keys at lines 40-52 and _STATE_RUNTIME_KEYS at line 68. None of the window-cursor keys exist. STATE_LINKED_ID (@livepicker-linked-id) tracks the linked window handle; the new STATE_PREVIEW_WIN_ID overlaps it for non-self candidates but diverges for the self-session (linked-id is empty there). Keep BOTH.\n2. INPUT: state.sh readonly constants block (lines 40-52). _STATE_RUNTIME_KEYS at line 68.\n3. LOGIC:\n   a. Add 4 new readonly constants:\n      readonly STATE_CAND_WIN_SESSION=\"@livepicker-cand-win-session\"  (cache-invalidation key: the candidate the cached list belongs to)\n      readonly STATE_CAND_WIN_LIST=\"@livepicker-cand-win-list\"  (newline-joined ordered window ids of that candidate)\n      readonly STATE_CAND_WIN_CURSOR=\"@livepicker-cand-win-cursor\"  (index into the list; defaults to the candidate's active window on entry)\n      readonly STATE_PREVIEW_WIN_ID=\"@livepicker-preview-win-id\"  (the window currently shown; overlaps STATE_LINKED_ID for non-self)\n   b. Append all 4 to _STATE_RUNTIME_KEYS so clear_all_state tears them down. The current line is:\n      readonly _STATE_RUNTIME_KEYS=\"$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH $STATE_RENDER_CACHE\"\n      Add: $STATE_CAND_WIN_SESSION $STATE_CAND_WIN_LIST $STATE_CAND_WIN_CURSOR $STATE_PREVIEW_WIN_ID\n   c. In livepicker.sh activate (after T2 list-build, around line ~280 where STATE_LIST/STATE_FILTER/STATE_INDEX are initialized), initialize the cursor: set STATE_CAND_WIN_SESSION to the current session name (from ORIG_SESSION), STATE_CAND_WIN_LIST to '' (derived lazily on first flip), STATE_CAND_WIN_CURSOR to '0' (defaults to active window), STATE_PREVIEW_WIN_ID to '' (no window shown yet). This is a no-behavior-change initialization — the cursor is read by P2.M1.T3's flip actions.\n4. OUTPUT: 4 new state keys available via get_state/set_state, cleared on teardown. Consumers: input-handler.sh (P2.M1.T3 flip/nav), preview.sh (P2.M1.T2 chosen window), confirm (P2.M2.T1 window commit).\n5. DOCS: none — internal state keys, no user-facing surface change.",

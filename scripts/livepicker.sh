@@ -352,14 +352,24 @@ activate_main() {
 	#       fires, which is after T5 sets mode-on).
 	#   (3) SWITCH key-table to livepicker (global, matching the -g save/restore
 	#       contract; the standalone `key-table` cmd is absent on 3.6b — FINDING 3).
-	# Discovery (PRD §8) is intentionally OMITTED: the defaults (C-M-Tab /
-	# C-M-BTab) already match this user's root-table window-nav keys
-	# (system_context §2), and discovery must not override explicit options.
-	local lp_key lp_keys lp_tf lp_c
+	# Resolve the two nav axes (PRD §8 h3.18 Discovery). For each axis, an explicit
+	# @livepicker-*-keys option OVERRIDES discovery; an EMPTY option falls back to
+	# lp_discover_axis_keys, which scans the user's live list-keys -T root/prefix for
+	# the keys they already use for that axis (muscle-memory reuse). Discovery drops
+	# mouse keys, plain alphanumerics (reserved for typing), and the control keys
+	# (confirm/cancel/backspace/rename/delete), so the axes are disjoint from typing
+	# and control — the bind order below is therefore collision-free.
+	local lp_tf lp_c s_next s_prev w_next w_prev
+	s_next="$(opt_session_next_keys)"; [ -z "$s_next" ] && s_next="$(lp_discover_axis_keys session next)"
+	s_prev="$(opt_session_prev_keys)"; [ -z "$s_prev" ] && s_prev="$(lp_discover_axis_keys session prev)"
+	w_next="$(opt_window_next_keys)";  [ -z "$w_next" ] && w_next="$(lp_discover_axis_keys window next)"
+	w_prev="$(opt_window_prev_keys)";  [ -z "$w_prev" ] && w_prev="$(lp_discover_axis_keys window prev)"
 
 	# (1) COPY prefix + root -> livepicker via source-file (tmux's own parser
 	# re-binds each line; the sed rewrites ONLY the first `-T <table>` which is
-	# always the table spec). Skip next/prev keys (FINDING 4 skip pattern).
+	# always the table spec). lp_filter_harmful_bindings drops the nav keys
+	# (switch-client / select-window / next-window / swap-window) from the copy, so
+	# the explicit axis binds below are authoritative (tmux keeps the last binding).
 	#
 	# H3 FIX — exclude HARMFUL copied bindings. The naive copy-all imports every
 	# tmux default root binding + every user binding, including many that break
@@ -381,20 +391,14 @@ activate_main() {
 	# copied through, preserving PRD §8's intent ("rest of their keybinds keep
 	# working") for keys that do not endanger the invariants.
 	#
-	# L3 FIX — the next/prev key skip uses a FIXED-STRING match (grep -F) per key
-	# rather than a single ERE interpolating the key values, so a user-set
-	# @livepicker-next-key containing regex metacharacters (`.`, `*`, `+`, `[`)
-	# is treated literally and cannot mis-skip / double-bind.
-	lp_key="$(opt_next_key)"
-	lp_keys="$(opt_prev_key)"
+	# (The old per-key grep -vF skip is GONE: lp_filter_harmful_bindings above already
+	# drops every nav command from the copy, and the explicit axis binds run LAST so
+	# they override any same-key survivor. research FINDING 3.)
 	lp_tf="$(mktemp)"
 	{
 		tmux list-keys -T prefix 2>/dev/null | sed 's/-T prefix/-T livepicker/'
 		tmux list-keys -T root   2>/dev/null | sed 's/-T root/-T livepicker/'
-	} | lp_filter_harmful_bindings \
-		| grep -vF -e "-T livepicker ${lp_key} " -e "-T livepicker ${lp_keys} " \
-			-e "-T livepicker -r ${lp_key} " -e "-T livepicker -r ${lp_keys} " \
-			> "$lp_tf"
+	} | lp_filter_harmful_bindings > "$lp_tf"
 	tmux source-file "$lp_tf"
 	rm -f "$lp_tf"
 
@@ -418,13 +422,27 @@ activate_main() {
 	for lp_c in $(opt_cancel_keys); do
 		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh cancel"
 	done
-	# nav: next-key + nav-next-keys -> next-session; prev-key + nav-prev-keys -> prev-session.
+	# Window axis (PRD §8 h3.19 step 3): discovered/explicit window-nav keys flip the
+	# previewed session's windows. next-window/prev-window are INERT until P2.M1.T3
+	# adds those actions to input-handler.sh (the *) no-op branch keeps the picker
+	# open); the BINDINGS are correct and land now (research FINDING 5).
 	# shellcheck disable=SC2086
-	for lp_c in $(opt_next_key) $(opt_nav_next_keys); do
+	for lp_c in $w_next; do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh next-window"
+	done
+	# shellcheck disable=SC2086
+	for lp_c in $w_prev; do
+		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh prev-window"
+	done
+
+	# Session axis (PRD §8 h3.19 step 4): discovered/explicit session-nav keys move the
+	# highlight between candidate sessions.
+	# shellcheck disable=SC2086
+	for lp_c in $s_next; do
 		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh next-session"
 	done
 	# shellcheck disable=SC2086
-	for lp_c in $(opt_prev_key) $(opt_nav_prev_keys); do
+	for lp_c in $s_prev; do
 		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh prev-session"
 	done
 
