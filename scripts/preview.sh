@@ -208,7 +208,7 @@ preview_main() {
 	# duplicating link-window is skipped (research FINDING 6). GUARD 1/2/3 own supersede.
 	if tmux list-windows -t "=$current_session" -F '#{window_id}' 2>/dev/null \
 		| grep -Fxq "$src_id"; then
-		tmux select-window -t "$src_id" 2>/dev/null || true
+		tmux select-window -t "$current_session:$src_id" 2>/dev/null || true
 		set_state "$STATE_LINKED_ID" "$src_id"
 		set_state "$STATE_PREVIEW_WIN_ID" "$src_id"   # P2.M1.T2: logical shown window (== LINKED_ID non-self)
 		return 0
@@ -218,7 +218,7 @@ preview_main() {
 	# src_id, e.g. single-match wrap): the window is already linked + selected.
 	# Skip unlink AND link (re-linking would silently duplicate). Just ensure shown.
 	if [ -n "$linked_id" ] && [ "$linked_id" = "$src_id" ]; then
-		tmux select-window -t "$src_id" 2>/dev/null || true
+		tmux select-window -t "$current_session:$src_id" 2>/dev/null || true
 		return 0
 	fi
 
@@ -261,7 +261,7 @@ preview_main() {
 	# Show it — all panes, live. select-window does NOT fire client-session-changed
 	# (Invariant A). It DOES fire session-window-changed (suppressed globally by
 	# P1.M4.T4.S2 — not this task's concern).
-	tmux select-window -t "$src_id" 2>/dev/null || true
+	tmux select-window -t "$current_session:$src_id" 2>/dev/null || true
 
 	# GUARD 3 — third supersede re-check before the LINKED_ID commit (bugfix Issue 4 /
 	# issue4_5_6_findings.md §Issue 4 part A; PRD §18 contract #3). Closes the
