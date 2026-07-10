@@ -54,9 +54,10 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout lp_rfit_ws saved_geom cur_geom h_orig
+	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout lp_rfit_ws saved_geom cur_geom h_orig pin_sess pin_ws
 
-	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
+	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window + restore any candidate pinned at
+	#     link time (P3.M2.T2.S1, PRD §23 Invariant C) ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
 	# (preview.sh cleared it) -> nothing to unlink (work-item point 1). Non-empty
 	# means a foreign window is linked into the driver -> unlink it from the
@@ -91,6 +92,32 @@ restore_main() {
 			# by tmux. Re-select ORIG_WINDOW first to guarantee the driver keeps a
 			# window BEFORE the unlink when the linked window is the active one.
 			# (Defensive: in practice the driver always retains ORIG_WINDOW.)
+		fi
+	fi
+	# P3.M2.T2.S1: restore a pinned candidate's window-size AFTER the driver unlink. ORDER IS
+	# LOAD-BEARING: the candidate's window is a SHARED object while linked into the driver (which
+	# has a client); unsetting its session window-size (→ inherits global "latest") while still
+	# linked lets the driver client drag the shared window down to its usable size. Unlink FIRST
+	# (above) so the candidate window is back in its own (detached) session → no client forces a
+	# reflow → restoring window-size is safe + trace-free. STATE_CAND_PIN_SESSION holds the
+	# last-pinned candidate session (set by preview.sh at link time; mid-browse-restored by
+	# preview.sh's two unlink paths). If it is still set here (the last preview was a pinned
+	# cross-session candidate and the user did not navigate away), replay its prior window-size
+	# (or UNSET the override when the prior was empty/inherited) so NO trace of our manual pin
+	# remains. This is the inline copy of preview.sh's _preview_restore_cand_pin (restore.sh is
+	# its OWN process under run-shell — cannot source it). Runs for BOTH keep and cancel (STEP 1
+	# is unconditional): on keep the confirmed session may BE the pinned candidate -> restoring
+	# window-size lets the now-attached client re-fit it (normal attach behavior; leaving it
+	# manual would be the ARM E3 harm). Detached-only pin => safe to restore. clear_all_state
+	# (STEP 6) clears STATE_CAND_PIN_* AFTER, so the reads succeed here. BARE session name for
+	# set-option (gotcha #1; mirror STEP 4's driver ws restore).
+	pin_sess="$(get_state "$STATE_CAND_PIN_SESSION" "")"
+	if [ -n "$pin_sess" ]; then
+		pin_ws="$(get_state "$STATE_CAND_PIN_WS" "")"
+		if [ -n "$pin_ws" ]; then
+			tmux set-option -t "$pin_sess" window-size "$pin_ws" 2>/dev/null || true
+		else
+			tmux set-option -u -t "$pin_sess" window-size 2>/dev/null || true
 		fi
 	fi
 

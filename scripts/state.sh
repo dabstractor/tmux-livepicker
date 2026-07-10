@@ -54,6 +54,8 @@ readonly STATE_CAND_WIN_SESSION="@livepicker-cand-win-session"  # cache-invalida
 readonly STATE_CAND_WIN_LIST="@livepicker-cand-win-list"        # newline-joined ordered window ids of STATE_CAND_WIN_SESSION's candidate; derived lazily on first window flip (P2.M1.T3); init '' at activate; cleared via _STATE_RUNTIME_KEYS
 readonly STATE_CAND_WIN_CURSOR="@livepicker-cand-win-cursor"    # 0-based index into STATE_CAND_WIN_LIST; defaults to the candidate's ACTIVE window on entry (PRD §9); advanced/wrapped by P2.M1.T3 next/prev-window; init '0' at activate; cleared via _STATE_RUNTIME_KEYS
 readonly STATE_PREVIEW_WIN_ID="@livepicker-preview-win-id"      # the window currently shown; OVERLAPS STATE_LINKED_ID for non-self candidates, DIVERGES for the self-session (linked-id empty there); set by P2.M1.T2 preview; init '' at activate; cleared via _STATE_RUNTIME_KEYS
+readonly STATE_CAND_PIN_SESSION="@livepicker-cand-pin-session"  # session name of the candidate pinned at link time (P3.M2.T2.S1, PRD §23); empty = none pinned; cleared via _STATE_RUNTIME_KEYS
+readonly STATE_CAND_PIN_WS="@livepicker-cand-pin-ws"            # that candidate's prior session window-size (empty = had no session override / inherited global -> restore UNSETS our manual pin); cleared via _STATE_RUNTIME_KEYS
 
 # --- saved-state CONTRACT keys (PRD §9; written by activate, read by restore) ---
 readonly ORIG_SESSION="@livepicker-orig-session"
@@ -70,7 +72,7 @@ readonly ORIG_STATUS_FORMAT_INDICES="@livepicker-orig-status-format-indices"
 readonly ORIG_STATUS_FORMAT_PREFIX="@livepicker-orig-status-format-"   # +N suffix (bracket-free)
 
 # keys clear_all_state unsets explicitly (STATE_TYPE deliberately absent: it is config)
-readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH $STATE_RENDER_CACHE $STATE_CAND_WIN_SESSION $STATE_CAND_WIN_LIST $STATE_CAND_WIN_CURSOR $STATE_PREVIEW_WIN_ID"
+readonly _STATE_RUNTIME_KEYS="$STATE_MODE $STATE_LIST $STATE_FILTER $STATE_INDEX $STATE_LINKED_ID $STATE_TAB_CURRENT_TMPL $STATE_TAB_INACTIVE_TMPL $STATE_PREVIEW_SEQ $STATE_PREVIEW_TARGET $STATE_SCROLL $STATE_CLIENT_WIDTH $STATE_RENDER_CACHE $STATE_CAND_WIN_SESSION $STATE_CAND_WIN_LIST $STATE_CAND_WIN_CURSOR $STATE_PREVIEW_WIN_ID $STATE_CAND_PIN_SESSION $STATE_CAND_PIN_WS"
 
 # $1: STATE_* key, $2: value. Writes a runtime @livepicker-* option (delegates to
 # utils tmux_set_opt). Caller passes a STATE_* constant, not a raw string.

@@ -381,14 +381,14 @@
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "Pane-geometry snapshot at activate + drift-gated restore",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Capture a pane-geometry snapshot of the original window at activate. In restore.sh STEP 5, compare current geometry to the snapshot; only select-layout if it drifted. This is the §23 'prevent, never repair' stance.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T1.S1",
                   "title": "Capture pane-geometry snapshot at activate",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: livepicker.sh STEP 2 (around line 155) already captures ORIG_SESSION, ORIG_WINDOW, ORIG_LAYOUT (window_layout string). PRD §9 adds: 'plus a pane-geometry snapshot of that window (#{pane_id}/#{pane_left}/#{pane_top}/#{pane_width}/#{pane_height} per pane). The geometry snapshot is so restore can detect whether anything drifted and act only if it did.'\n2. INPUT: livepicker.sh STEP 2 state-save block. state.sh ORIG_* constants block.\n3. LOGIC:\n   a. In state.sh, add: readonly ORIG_PANE_GEOMETRY=\"@livepicker-orig-pane-geometry\" (an ORIG_* saved key, auto-cleared by clear_all_state's grep '@livepicker-orig-').\n   b. In livepicker.sh STEP 2, after the ORIG_LAYOUT capture, add:\n      tmux set-option -g \"$ORIG_PANE_GEOMETRY\" \"$(tmux list-panes -t \"$(lp_client_format '#{window_id}')\" -F '#{pane_id}:#{pane_left},#{pane_top},#{pane_width},#{pane_height}' 2>/dev/null)\"\n      This captures the original window's pane geometry at activation. Use the client-aware ORIG_WINDOW (already saved) or lp_client_format '#{window_id}' for the target.\n4. OUTPUT: ORIG_PANE_GEOMETRY populated at activate, available to restore for drift detection.\n5. DOCS: none — internal state.",

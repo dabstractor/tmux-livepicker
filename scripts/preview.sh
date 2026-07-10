@@ -84,10 +84,33 @@ preview_fallback() {
 	captured="$(tmux capture-pane -ep -t "$target" 2>/dev/null)" && return 0 || return 1
 }
 
+# P3.M2.T2.S1 (PRD §23): restore a previously-pinned candidate's window-size. Called from
+# preview.sh's TWO unlink paths (self-session + replace) BEFORE the unlink/link, so the
+# candidate session returns to its prior window-size (no trace of our manual pin). Reads
+# STATE_CAND_PIN_SESSION/WS; if set, replays the prior window-size (or UNSETS the session
+# override when the prior value was empty/inherited) on the BARE session name, then clears
+# both keys. No-op when nothing was pinned. Idempotent (clears state after restoring).
+# restore.sh STEP 1 has its OWN inline copy (separate process under run-shell — cannot source
+# this helper). The pin was detached-only (preview.sh gate), so restoring window-size is
+# safe (no client to fight). NO '=' prefix on set-option -t (gotcha #1; mirror the §22 driver clip).
+_preview_restore_cand_pin() {
+	local pin_sess pin_ws
+	pin_sess="$(get_state "$STATE_CAND_PIN_SESSION" "")"
+	[ -z "$pin_sess" ] && return 0
+	pin_ws="$(get_state "$STATE_CAND_PIN_WS" "")"
+	if [ -n "$pin_ws" ]; then
+		tmux set-option -t "$pin_sess" window-size "$pin_ws" 2>/dev/null || true
+	else
+		tmux set-option -u -t "$pin_sess" window-size 2>/dev/null || true
+	fi
+	tmux_unset_opt "$STATE_CAND_PIN_SESSION"
+	tmux_unset_opt "$STATE_CAND_PIN_WS"
+}
+
 # argv[1] = candidate session name S.
 preview_main() {
 	local S="${1:-}" chosen_win="${2:-}" expected_seq="${3:-}"
-	local current_session orig_window linked_id src_id w_sess w_idx cur_seq check_session
+	local current_session orig_window linked_id src_id w_sess w_idx cur_seq check_session cand_sess cand_ws cand_h
 
 	# The session we preview INSIDE (the driver). Equal to the live client session
 	# during browsing (Invariant A); client-independent (FINDING 9).
@@ -148,6 +171,11 @@ preview_main() {
 		# it — S1 FINDING 1; no -k, || true — S1 FINDING 2), then clear LINKED_ID.
 		if [ -n "$linked_id" ]; then
 			tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
+			# P3.M2.T2.S1 (PRD §23): restore a pinned candidate's window-size AFTER unlinking
+			# its window (see replace-path comment: unlink-then-restore — the candidate window
+			# is shared while linked; unsetting window-size first lets the driver client reflow
+			# it). No-op if nothing was pinned (detached+clip only).
+			_preview_restore_cand_pin
 			tmux_unset_opt "$STATE_LINKED_ID"
 		fi
 		# Select the target window: window mode -> the specific "session:index" ($S);
@@ -244,6 +272,46 @@ preview_main() {
 	if [ -n "$linked_id" ]; then
 		tmux unlink-window -t "$current_session:$linked_id" 2>/dev/null || true
 	fi
+	# P3.M2.T2.S1 (PRD §23): restore the PREVIOUSLY-pinned candidate's window-size AFTER
+	# unlinking its window from the driver. ORDER IS LOAD-BEARING: the candidate's window is
+	# a SHARED object while linked into the driver (which has a client); unsetting its
+	# session window-size (→ inherits global "latest") while still linked lets the driver
+	# client drag the shared window down to its usable size (120x40 → 120x22). Unlink FIRST
+	# so the candidate window is back to its own (detached) session only → no client forces
+	# a reflow → restoring window-size is safe + trace-free. Idempotent (clears
+	# STATE_CAND_PIN_*). No-op if nothing was pinned (detached+clip only).
+	_preview_restore_cand_pin
+
+	# P3.M2.T2.S1 (PRD §23 Prevention-regime bullet 2): PIN THE NEW CANDIDATE at link time,
+	# CONDITIONAL. GATE (pane_immutability_verification.md §1/§7): (1) clip mode — the
+	# driver must be manual too, else its latest client drags the shared window and the
+	# candidate pin cannot hold (reflow retains its documented resize behavior); (2) NON-SELF
+	# (we are past the self-session guard); (3) DETACHED — a client-bearing candidate is
+	# HARMED by `window-size manual` (ARM E3: reverts its client view to the creation size);
+	# the bare link does NOT disturb it (ARM E4), so skipping the pin there is safe.
+	# Under the gate: freeze the candidate's session window-size to manual + pin its window
+	# height, so the shared window keeps the candidate's geometry (ARM B2: byte-identical,
+	# deterministic). Record the candidate session + prior window-size so
+	# _preview_restore_cand_pin / restore.sh STEP 1 can undo it. BARE session name for
+	# set-option/show-options (gotcha #1 — set-option REJECTS '='; list-clients takes it).
+	# cand_h reads the detached candidate's creation size — CORRECT (we pin at its OWN
+	# natural size). resize-window -y cand_h is the §23-SANCTIONED candidate pin (NOT a
+	# violation — §23 prescribes it). Pin BEFORE link-window (ARM B2 verified recipe).
+	cand_sess="$check_session"
+	if [ "$(opt_preview_fit)" = "clip" ] && [ -n "$cand_sess" ] \
+		&& [ -z "$(tmux list-clients -t "=$cand_sess" 2>/dev/null)" ]; then
+		cand_ws="$(tmux show-options -t "$cand_sess" -v window-size 2>/dev/null || true)"
+		cand_h="$(tmux display-message -p -t "$src_id" '#{window_height}' 2>/dev/null || true)"
+		tmux set-option -t "$cand_sess" window-size manual 2>/dev/null || true
+		if [ -n "$cand_h" ]; then
+			tmux resize-window -y "$cand_h" -t "$src_id" 2>/dev/null || true
+		fi
+		set_state "$STATE_CAND_PIN_SESSION" "$cand_sess"
+		set_state "$STATE_CAND_PIN_WS" "$cand_ws"
+	fi
+	# (If link-window below FAILS -> preview_fallback/snapshot: the pin was manual + a
+	#  size-no-op resize (cand_h == the candidate's own height); STATE_CAND_PIN_* is set, so
+	#  the next nav / teardown restores it. Benign + trace-free. Do not over-engineer.)
 
 	# Link S's active window into the current session. BARE link-window (no -a)
 	# appends at the next free index at the END, so NO existing window's index
