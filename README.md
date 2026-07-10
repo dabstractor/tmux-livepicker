@@ -8,7 +8,7 @@ place, without leaving your current session.
 tmux-livepicker turns the status bar into a fuzzy picker. While the picker is
 active the status bar grows to two lines: line 1 is the candidate list, and the
 area below it shows a live, all-panes preview of the highlighted candidate. You
-filter by typing and move the selection with your usual window-navigation keys.
+filter by typing. Move between sessions with your session-nav keys, and flip the highlighted session's windows with your window-nav keys, both discovered from your config.
 Confirming lands you on the chosen session **and the exact window being
 previewed**, not just the session (optionally creating a new one from
 your filter query); cancelling restores your status line, key table, and focus
@@ -21,8 +21,14 @@ timeline or its Alt-Tab style toggle.
 - **Status-line picker.** List sessions or windows in the status bar, no popup.
 - **Live, in-place preview.** See every pane of the highlighted candidate as you
   browse, rendered in your current window.
-- **Filter + repurposed navigation.** Type to filter; move with keys you already
-  use to navigate windows.
+- **Two-axis navigation.** Move between sessions with your session-nav keys; flip
+  the highlighted session's windows with your window-nav keys. Both are discovered
+  from your config (see [Two-axis navigation](#two-axis-navigation)).
+- **Confirm on window.** Confirm lands on the chosen session **and the exact
+  window being previewed**, not just the session.
+- **Leave-no-trace browsing.** Flipping a candidate's windows never changes that
+  candidate's active window or any pane. Moving on, confirming, or cancelling
+  restores everything exactly.
 - **Create on Enter.** In session mode, with no match, Enter creates a session
   from your filter query.
 - **Zero history pollution.** Browsing fires no `client-session-changed`, so
@@ -42,12 +48,16 @@ timeline or its Alt-Tab style toggle.
 
 - **Activate.** I press my prefix, then `@livepicker-key`, and the picker appears
   in the status bar with a live preview below it.
-- **Navigate.** I press my next/previous window keys and the selection moves to a
-  different session, with the preview following live.
+- **Navigate sessions.** I press my session-nav key (`)` or `Down`) and the
+  highlight moves to the next session, with the preview following live.
+- **Flip windows.** While previewing a session, I press my window-nav key
+  (`Ctrl-M-Tab`) and the preview flips to that session's next window, live. The
+  session's own active window is unchanged; I am only looking.
 - **Filter.** I type `log` and the list narrows to sessions whose names
   fuzzy-match `log` (characters in order, not necessarily contiguous), with the
   best match first.
-- **Confirm.** I press `Enter` and land on the selected session.
+- **Confirm.** I press `Enter` and land on the chosen session **and the exact
+  window being previewed**.
 - **Create.** I type `newproj` (no match) and press `Enter`; a new `newproj`
   session is created and I am switched to it.
   Characters tmux disallows in
@@ -100,7 +110,7 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-zoxide-mode`          | `off`      | In session mode, resolve the create query through `zoxide` and start the session in that dir (mirrors `@sessionx-zoxide-mode`). |
 | `@livepicker-session-next-keys` | `(discovered)` | Next-session keys (session axis). Default: discovered `switch-client -n` bindings + `Down`. For this user: `)`, `Down`. Must be non-alphanumeric; a plain letter/digit is intercepted and not typeable. Section 8. |
 | `@livepicker-session-prev-keys` | `(discovered)` | Previous-session keys (session axis). Default: discovered `switch-client -p` bindings + `Up`. For this user: `(`, `Up`. Must be non-alphanumeric. Section 8. |
-| `@livepicker-window-next-keys`  | `(discovered)` | Next-window keys (window axis — flip the previewed session's windows). Default: discovered next-window bindings. For this user: `C-M-Tab`, `M-n`, `C-n`, `C-l`. Must be non-alphanumeric. Section 8. |
+| `@livepicker-window-next-keys`  | `(discovered)` | Next-window keys (window axis: flip the previewed session's windows). Default: discovered next-window bindings. For this user: `C-M-Tab`, `M-n`, `C-n`, `C-l`. Must be non-alphanumeric. Section 8. |
 | `@livepicker-window-prev-keys`  | `(discovered)` | Previous-window keys (window axis). Default: discovered prev-window bindings. For this user: `C-M-BTab`, `M-p`, `C-p`, `C-h`. Must be non-alphanumeric. Section 8. |
 | `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                   |
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                    |
@@ -152,6 +162,38 @@ Line 1 of the status bar is the picker. Its layout is the same for both `plain` 
 - **No match.** With no matching session, line 1 shows the icon and query followed by ` (no match)`; create-on-Enter still applies.
 - **Justify.** While a query is active, `status-justify` is suspended because the query is pinned left and the tabs must flow left-to-right for the scroll viewport. `status-justify` is honored only when there is no query and the tabs fit.
 
+### Two-axis navigation
+
+The picker has two navigation axes, and both reuse the keys you already have
+bound for that axis. Each is discovered from your live key tables when you
+leave the option unset, and either can be overridden with an explicit option.
+
+- **Session axis** (move between candidates). Defaults to your `switch-client -n`
+  and `-p` bindings plus the arrow keys (`Down` next, `Up` prev). Override with
+  `@livepicker-session-next-keys` / `@livepicker-session-prev-keys`.
+- **Window axis** (flip the previewed session's windows). Defaults to your
+  `next-window` / `previous-window` / `select-window -n` / `-p` bindings
+  (including `swap-window ... ; select-window` compounds). Override with
+  `@livepicker-window-next-keys` / `@livepicker-window-prev-keys`.
+- **Discovery.** When an axis option is unset, the picker reads `tmux
+  list-keys -T root` and `-T prefix`, matches the window-axis command substrings
+  and the session-axis `switch-client -n` / `-p` (not `-l` toggle or `-t <name>`),
+  and always adds the arrow keys to the session axis. It drops plain letters and
+  digits (reserved for the query), keeps control/meta/arrow/function keys, and
+  de-duplicates. Explicit options override discovery.
+- **Non-alphanumeric constraint.** Every navigation, confirm, cancel, backspace,
+  and management key is non-alphanumeric, because plain letters and digits are
+  reserved for the query. A plain letter or digit used for navigation is
+  silently untypeable. For vim-style `j` / `k` session-nav, set the option
+  explicitly and accept that those letters then cannot be typed.
+- **Low-cost revert.** The picker uses a modal key table; on cancel the table
+  switches back (typically `root`), so the bindings revert for free.
+
+The window-nav keys keep doing window navigation, scoped to the previewed
+session. They are not converted into session-nav keys (an earlier design did
+that; it fought muscle memory and was dropped). See [Window preview](#window-preview)
+for the confirm-on-window and leave-no-trace guarantees.
+
 ## Usage
 
 1. **Activate:** press your prefix, then `@livepicker-key` (`Space` by
@@ -166,7 +208,7 @@ Line 1 of the status bar is the picker. Its layout is the same for both `plain` 
    (`@livepicker-window-next-keys` / `-window-prev-keys`, discovered from your
    own `next-window` / `previous-window` bindings) flip its windows live. Line
    2's window-status follows the flip. The session's own active window is
-   untouched — you are only looking.
+   untouched: you are only looking.
 5. **Confirm:** `Enter` lands on the chosen session **and the exact window
    being previewed** (not just the session), or creates a session from
    your query in `session` mode with no match.
@@ -209,6 +251,24 @@ tmux-session-history timeline and the toggle pointer are untouched while you
 browse. The only session switch in the whole flow is the single `switch-client`
 at confirm. Cancelling leaves zero trace.
 
+### Window preview
+
+Confirm lands on the exact window you were previewing. It resolves the target
+session from the ranked list and the target window from the window cursor (the
+window currently previewed for that session), commits that window with one
+`select-window`, then `switch-client`s. You arrive on the session and the tab
+you were looking at. For the self-session, or `snapshot` / `off` preview modes
+with no chosen window, the target is the session's active window.
+
+Flipping never changes a candidate's own state. Window-nav flips link the
+chosen window into the driver and select it there; they never call
+`select-window` on the candidate session, so the candidate's own active window
+and pane layout never change while browsing (Invariant B). Moving to another
+session, or cancelling, leaves every peeked candidate exactly as you found it.
+Confirm is the one deliberate change (the single `select-window` that commits
+your choice); everything else is read-only. Pane geometry across all sessions
+is the stronger guarantee in [Known limitations](#known-limitations).
+
 ### Known limitations
 
 Two preview-resizing effects stem from tmux's `window-size` behavior on a linked (live) preview window. One is fixed by default; the other persists.
@@ -250,8 +310,11 @@ a fresh isolated tmux server and sources the user config). The suites cover the 
 - **Live preview:** the all-panes in-place preview.
 - **Pollution invariant:** browsing fires no `client-session-changed`.
 - **Byte-exact restore:** status, keys, focus, and hooks are restored.
-- **Key repurpose:** repurposed window-nav keys revert on cancel.
+- **Two-axis key discovery:** discovered session-nav and window-nav keys are bound and revert on cancel.
+- **Window flip + confirm-on-window:** window-nav flips the previewed session's windows live; confirm lands on the exact previewed window.
+- **Pane immutability:** preview, flip, and cancel leave every session's panes byte-identical (Invariant C).
 - **Create on Enter:** session creation from an unmatched query.
+- **Layout, ranking, scroll, and session management:** query bar, fuzzy ranking, the scroll viewport, and rename/delete.
 
 ## Maintenance
 
