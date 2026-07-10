@@ -427,66 +427,70 @@ activate_main() {
 	# (The old per-key grep -vF skip is GONE: lp_filter_harmful_bindings above already
 	# drops every nav command from the copy, and the explicit axis binds run LAST so
 	# they override any same-key survivor. research FINDING 3.)
+	#
+	# CRASH-MITIGATION (proc_send NULL-peer race, tmux 3.6b): ALL key-table setup is
+	# batched into ONE `tmux source-file` instead of ~80 individual `tmux bind-key`
+	# calls. Each bare `tmux <cmd>` is a fresh client connection that connects, runs
+	# one command, and exits — a burst of ~80 short-lived clients in a tight loop wins
+	# the server-side teardown race (server-client.c sets c->peer=NULL on disconnect
+	# while a concurrent proc_send(c->peer,...) derefs it -> SIGSEGV in proc.c:167).
+	# The copy-first/explicit-last ordering is preserved because a source-file applies
+	# its lines sequentially, so explicit keys emitted AFTER the copy override any
+	# same-key survivor. (The prefix+root copy already used this idiom; this extends
+	# it to the explicit keys.)
 	lp_tf="$(mktemp)"
 	{
-		tmux list-keys -T prefix 2>/dev/null | sed 's/-T prefix/-T livepicker/'
-		tmux list-keys -T root   2>/dev/null | sed 's/-T root/-T livepicker/'
-	} | lp_filter_harmful_bindings > "$lp_tf"
+		# copied prefix+root bindings FIRST (filtered).
+		{
+			tmux list-keys -T prefix 2>/dev/null | sed 's/-T prefix/-T livepicker/'
+			tmux list-keys -T root   2>/dev/null | sed 's/-T root/-T livepicker/'
+		} | lp_filter_harmful_bindings
+		# explicit picker keys AFTER the copy -> override any copied same-key binding.
+		# input-handler.sh path uses $CURRENT_DIR (the scripts/ dir global).
+		# typing: a-z A-Z 0-9 and - _ . / (PRD §8; FINDING 5 — `-` binds with no `--`).
+		for lp_c in {a..z} {A..Z} {0..9} - _ . /; do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh type %s'\n" "$lp_c" "$CURRENT_DIR" "$lp_c"
+		done
+		# backspace / confirm / cancel (space-list accessors -> word-split; SC2086).
+		# shellcheck disable=SC2086
+		for lp_c in $(opt_backspace_keys); do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh backspace'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# shellcheck disable=SC2086
+		for lp_c in $(opt_confirm_keys); do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh confirm'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# shellcheck disable=SC2086
+		for lp_c in $(opt_cancel_keys); do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh cancel'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# Window axis (PRD §8 h3.19 step 3): discovered/explicit window-nav keys flip
+		# the previewed session's windows.
+		# shellcheck disable=SC2086
+		for lp_c in $w_next; do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh next-window'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# shellcheck disable=SC2086
+		for lp_c in $w_prev; do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh prev-window'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# Session axis (PRD §8 h3.19 step 4): discovered/explicit session-nav keys move
+		# the highlight between candidate sessions.
+		# shellcheck disable=SC2086
+		for lp_c in $s_next; do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh next-session'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# shellcheck disable=SC2086
+		for lp_c in $s_prev; do
+			printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh prev-session'\n" "$lp_c" "$CURRENT_DIR"
+		done
+		# P2.M1.T1.S1: session-mgmt keys (rename + delete), PRD §21 step 5. SINGLE keys;
+		# distinct tmux keys from r / BSpace so typing is unaffected.
+		printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh rename'\n" "$(opt_rename_key)" "$CURRENT_DIR"
+		printf "bind-key -T livepicker %s run-shell '%s/input-handler.sh delete'\n" "$(opt_delete_key)" "$CURRENT_DIR"
+	} > "$lp_tf"
 	tmux source-file "$lp_tf"
 	rm -f "$lp_tf"
-
-	# (2) BIND explicit picker keys (run AFTER the copy -> override any copied
-	# same-key binding). input-handler.sh path uses $CURRENT_DIR (the scripts/
-	# dir global; same idiom as T3's renderer install).
-	# typing: a-z A-Z 0-9 and - _ . / (PRD §8; FINDING 5 — `-` binds with no `--`).
-	for lp_c in {a..z} {A..Z} {0..9} - _ . /; do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh type $lp_c"
-	done
-	# backspace / confirm / cancel (space-list accessors -> word-split; SC2086).
-	# shellcheck disable=SC2086
-	for lp_c in $(opt_backspace_keys); do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh backspace"
-	done
-	# shellcheck disable=SC2086
-	for lp_c in $(opt_confirm_keys); do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh confirm"
-	done
-	# shellcheck disable=SC2086
-	for lp_c in $(opt_cancel_keys); do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh cancel"
-	done
-	# Window axis (PRD §8 h3.19 step 3): discovered/explicit window-nav keys flip the
-	# previewed session's windows. next-window/prev-window are INERT until P2.M1.T3
-	# adds those actions to input-handler.sh (the *) no-op branch keeps the picker
-	# open); the BINDINGS are correct and land now (research FINDING 5).
-	# shellcheck disable=SC2086
-	for lp_c in $w_next; do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh next-window"
-	done
-	# shellcheck disable=SC2086
-	for lp_c in $w_prev; do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh prev-window"
-	done
-
-	# Session axis (PRD §8 h3.19 step 4): discovered/explicit session-nav keys move the
-	# highlight between candidate sessions.
-	# shellcheck disable=SC2086
-	for lp_c in $s_next; do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh next-session"
-	done
-	# shellcheck disable=SC2086
-	for lp_c in $s_prev; do
-		tmux bind-key -T livepicker "$lp_c" run-shell "$CURRENT_DIR/input-handler.sh prev-session"
-	done
-
-	# --- P2.M1.T1.S1: session-mgmt keys (rename + delete), PRD §21 step 5. ---
-	# SINGLE keys (not space-lists -> no loop). Bound AFTER the typing + nav
-	# blocks so they OVERRIDE any same-key copy (C-r / M-BSpace are distinct
-	# tmux keys from r / BSpace, so typing is unaffected -- PRD §8/§16). INERT
-	# until P2.M1.T2 adds the rename)/delete) dispatch in input-handler.sh (the
-	# default * branch is a no-op return 0 -> picker stays open).
-	tmux bind-key -T livepicker "$(opt_rename_key)" run-shell "$CURRENT_DIR/input-handler.sh rename"
-	tmux bind-key -T livepicker "$(opt_delete_key)" run-shell "$CURRENT_DIR/input-handler.sh delete"
 
 	# (3) SWITCH the active key-table to livepicker (global; FINDING 3: -g is
 	# mandatory and the standalone `key-table` cmd does not exist on 3.6b).
