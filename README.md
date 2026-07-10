@@ -97,10 +97,10 @@ All options use the `@livepicker-` prefix. Defaults are the shipped values from
 | `@livepicker-type`                 | `session`  | `session` or `window`. What the picker lists.                                                        |
 | `@livepicker-create`               | `on`       | In session mode, create a new session from the query on Enter when nothing matches.                  |
 | `@livepicker-zoxide-mode`          | `off`      | In session mode, resolve the create query through `zoxide` and start the session in that dir (mirrors `@sessionx-zoxide-mode`). |
-| `@livepicker-next-key`             | `C-M-Tab`  | Key that moves to the next session. Defaults to this user's next-window key.                         |
-| `@livepicker-prev-key`             | `C-M-BTab` | Key that moves to the previous session. Defaults to this user's prev-window key.                     |
-| `@livepicker-nav-next-keys`        | `Down`     | Extra next-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
-| `@livepicker-nav-prev-keys`        | `Up`       | Extra previous-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
+| `@livepicker-session-next-keys` | `(discovered)` | Next-session keys (session axis). Default: discovered `switch-client -n` bindings + `Down`. For this user: `)`, `Down`. Must be non-alphanumeric; a plain letter/digit is intercepted and not typeable. Section 8. |
+| `@livepicker-session-prev-keys` | `(discovered)` | Previous-session keys (session axis). Default: discovered `switch-client -p` bindings + `Up`. For this user: `(`, `Up`. Must be non-alphanumeric. Section 8. |
+| `@livepicker-window-next-keys`  | `(discovered)` | Next-window keys (window axis — flip the previewed session's windows). Default: discovered next-window bindings. For this user: `C-M-Tab`, `M-n`, `C-n`, `C-l`. Must be non-alphanumeric. Section 8. |
+| `@livepicker-window-prev-keys`  | `(discovered)` | Previous-window keys (window axis). Default: discovered prev-window bindings. For this user: `C-M-BTab`, `M-p`, `C-p`, `C-h`. Must be non-alphanumeric. Section 8. |
 | `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                   |
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                    |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                    |
@@ -168,7 +168,7 @@ Line 1 of the status bar is the picker. Its layout is the same for both `plain` 
    kills it. See [Session management](#session-management).
 
 - With [tubular](https://github.com/danutatubu/tubular-tmux), the prefix is `None` and `C-Space` enters the prefix table, so the activate sequence is `C-Space` → `Space`.
-- Letters and digits go to the query by default; set `@livepicker-nav-next-keys` / `-prev-keys` to `j` / `k` for vim-style navigation at the cost of typing them.
+- Letters and digits go to the query by default; set `@livepicker-session-next-keys` / `-session-prev-keys` to `j` / `k` for vim-style navigation at the cost of typing them.
 
 While the picker is active, the key table is fully modal: keys not explicitly
 bound to a picker action (typing, navigation, confirm, cancel) or carried over

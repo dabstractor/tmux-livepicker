@@ -27,10 +27,10 @@ opt_key()                  { get_opt "@livepicker-key" ""; }                  # 
 opt_type()                 { get_opt "@livepicker-type" "session"; }          # enum: session|window
 opt_create()               { get_opt "@livepicker-create" "on"; }             # bool on/off (session mode only)
 opt_zoxide()               { get_opt "@livepicker-zoxide-mode" "off"; }       # bool on/off (session-mode create only)
-opt_next_key()             { get_opt "@livepicker-next-key" "C-M-Tab"; }      # single key (repurposed window-nav)
-opt_prev_key()             { get_opt "@livepicker-prev-key" "C-M-BTab"; }     # single key (repurposed window-nav)
-opt_nav_next_keys()        { get_opt "@livepicker-nav-next-keys" "Down"; }    # space-list (caller word-splits)
-opt_nav_prev_keys()        { get_opt "@livepicker-nav-prev-keys" "Up"; }      # space-list (caller word-splits)
+opt_session_next_keys()    { get_opt "@livepicker-session-next-keys" ""; }    # space-list; empty=discover session axis (switch-client -n + Down; PRD §8/§11)
+opt_session_prev_keys()    { get_opt "@livepicker-session-prev-keys" ""; }    # space-list; empty=discover session axis (switch-client -p + Up)
+opt_window_next_keys()     { get_opt "@livepicker-window-next-keys" ""; }     # space-list; empty=discover window axis (next-window keys)
+opt_window_prev_keys()     { get_opt "@livepicker-window-prev-keys" ""; }     # space-list; empty=discover window axis (prev-window keys)
 opt_confirm_keys()         { get_opt "@livepicker-confirm-keys" "Enter"; }    # space-list
 opt_cancel_keys()          { get_opt "@livepicker-cancel-keys" "Escape"; }    # space-list (clear query, else cancel)
 opt_backspace_keys()       { get_opt "@livepicker-backspace-keys" "BSpace"; } # space-list
