@@ -487,28 +487,28 @@
       "type": "Phase",
       "id": "P4",
       "title": "Sync changeset-level documentation (Mode B)",
-      "status": "Planned",
+      "status": "Ready",
       "description": "Sweep the two-axis navigation, window-flip, confirm-on-window, and pane-immutability invariants into coherent README prose and a CHANGELOG entry. Depends on P1, P2, P3.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P4.M1",
           "title": "README + CHANGELOG changeset sync",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Fold the per-feature Mode-A doc edits into coherent prose in README.md and add a CHANGELOG entry. Do NOT edit PRD.md (read-only).",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M1.T1",
               "title": "README + CHANGELOG changeset sync",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Update README.md with two-axis navigation, window-flip preview, confirm-on-window, and leave-no-trace prose. Add CHANGELOG entry.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P4.M1.T1.S1",
                   "title": "Update README.md with two-axis nav + window-flip + confirm-on-window prose",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",
@@ -530,7 +530,7 @@
                   "type": "Subtask",
                   "id": "P4.M1.T1.S2",
                   "title": "Add CHANGELOG entry for the changeset",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M1.T1.S1"
