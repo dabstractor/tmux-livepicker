@@ -1,0 +1,79 @@
+h1.0 tmux-livepicker: Product Requirements Document
+ h2.0 0. Prior attempt (remove this section after implementation)
+ h2.1 1. Overview
+ h2.2 2. Goals and non-goals
+  h3.0 Goals
+  h3.1 Non-goals
+ h2.3 3. User stories
+ h2.4 4. The core rule: preview without switching
+ h2.5 5. Architecture
+  h3.2 Data flow
+ h2.6 6. Behaviors
+  h3.3 Activation
+  h3.4 Filtering and ranking
+  h3.5 Session navigation
+  h3.6 Window navigation (flip within the previewed session)
+  h3.7 Confirm
+  h3.8 Cancel
+  h3.9 Scrolling and overflow (status layout)
+  h3.10 Session management (rename / delete)
+ h2.7 7. The preview subsystem (live, all panes)
+  h3.11 Mechanism: link-window plus select-window (on the driver only)
+  h3.12 Fallbacks
+  h3.13 Self-session edge case
+  h3.14 Side effects to suppress
+  h3.15 Input during preview
+  h3.16 Sizing: clip, don't reflow (and never mutate panes — section 23)
+ h2.8 8. The key subsystem (two-axis navigation, discovered)
+  h3.17 Why this is low-cost
+  h3.18 Discovery
+  h3.19 Binding
+ h2.9 9. State saved and restored
+ h2.10 10. Status-line setup
+ h2.11 11. Configuration options
+ h2.12 12. File layout
+ h2.13 13. tmux primitives reference
+ h2.14 14. Pollution and compatibility analysis
+ h2.15 15. Validation
+  h3.20 Functional
+  h3.21 Pollution (the core invariant)
+  h3.22 Live all-panes preview
+  h3.23 Pane immutability (Invariant C — load-bearing)
+  h3.24 Key discovery / two-axis
+  h3.25 Restore
+  h3.26 Create-on-enter
+  h3.27 Responsiveness
+  h3.28 Appearance (window-status hijack)
+  h3.29 Layout, ranking, scroll, and management
+ h2.16 16. Implementation risks and notes
+ h2.17 17. Tab appearance — reuse the window-status format
+ h2.18 18. Responsiveness — interaction-first, deferred preview
+ h2.19 19. Status-line layout: query bar, viewport, overflow
+  h3.30 Two independent visibility rules
+  h3.31 Query empty (open, or cleared)
+  h3.32 Query active (≥1 character typed)
+  h3.33 The viewport and scroll
+  h3.34 Overflow indicators
+  h3.35 No-match state
+  h3.36 Width source
+ h2.20 20. Filtering and ranking (fuzzy)
+  h3.37 Match rule — subsequence
+  h3.38 Scoring
+  h3.39 Empty query
+  h3.40 Interface
+  h3.41 Performance
+ h2.21 21. Session management (rename / delete)
+  h3.42 Keys
+  h3.43 Rename
+  h3.44 Delete
+  h3.45 Window mode (@livepicker-type window)
+  h3.46 Delete key caveat
+ h2.22 22. Preview sizing: clip instead of reflow (kill the status-grow jank)
+  h3.47 The problem
+  h3.48 The fix: freeze the preview's height, clip its bottom row
+  h3.49 Mechanism (intended)
+  h3.50 Control
+  h3.51 Verification required (load-bearing)
+ h2.23 23. Pane immutability — zero mutation of any session's panes
+---
+code:5 para:107 list:52 table:1 quote:1
