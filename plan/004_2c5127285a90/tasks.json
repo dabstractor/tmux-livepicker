@@ -374,7 +374,7 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "Pane-geometry snapshot + drift-gated restore + conditional candidate pin",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Implement the pane-geometry snapshot at activate and the drift-gated restore in restore.sh STEP 5 (only select-layout if geometry drifted). Conditionally implement candidate-window pinning at link time based on P3.M1.T1's decision.",
           "tasks": [
             {
@@ -420,14 +420,14 @@
               "type": "Task",
               "id": "P3.M2.T2",
               "title": "Candidate-window pinning at link time (CONDITIONAL on P3.M1.T1)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Only if pane_immutability_verification.md says candidate pinning holds the invariant. When linking a non-self candidate window, freeze the candidate's window-size + pin its geometry before the link, and restore on unlink. If P3.M1.T1 decided pinning is infeasible, this task is a no-op and snapshot is the documented contract.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T2.S1",
                   "title": "Pin candidate at link time + restore on unlink (conditional)",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M1.T1.S1",
