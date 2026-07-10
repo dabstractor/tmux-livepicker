@@ -196,9 +196,9 @@ for the confirm-on-window and leave-no-trace guarantees.
 
 ## Usage
 
-1. **Activate:** press your prefix, then `@livepicker-key` (`Space` by
-   default). The status bar grows to two lines: the picker, with a live
-   preview of the highlighted candidate below.
+1. **Activate:** press your prefix, then `@livepicker-key` (the
+   key you set; there is no default). The status bar grows to two lines: the
+   picker, with a live preview of the highlighted candidate below.
 2. **Filter:** type to filter; matching is fuzzy and ranked best-first
    (see [Status line](#status-line)). `BSpace` removes a character.
 3. **Navigate sessions:** `Down` / `Up` (or your `@livepicker-session-next-keys` /

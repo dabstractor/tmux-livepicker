@@ -331,7 +331,7 @@
       "type": "Phase",
       "id": "P3",
       "title": "Pane immutability (§23): snapshot, drift-restore, verify, candidate pin",
-      "status": "Ready",
+      "status": "Complete",
       "description": "The absolute invariant: no pane of any session is ever moved or resized, even though the preview is a shared window object. This phase verifies whether freezing the candidate at link time prevents the source-view resize, implements candidate-window pinning if needed, and hardens activate/restore with a pane-geometry snapshot and drift-gated layout restore.",
       "milestones": [
         {
@@ -449,21 +449,21 @@
           "type": "Milestone",
           "id": "P3.M3",
           "title": "Validation (§23 pane immutability)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Write test_pane_immutability.sh covering Invariant C with a real client: no candidate pane movement, no status-grow reflow, no confirm side-effects, original window intact.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M3.T1",
               "title": "test_pane_immutability.sh (Invariant C, real client)",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Under the isolated socket + attach_test_client, assert pane geometry is byte-identical across flip+cancel, status-grow, confirm, and original-window cycles.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M3.T1.S1",
                   "title": "Write test_pane_immutability.sh Invariant C test suite",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M2.T1.S2",

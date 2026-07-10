@@ -334,15 +334,27 @@ activate_main() {
 		# driver had no override (inherits global "latest", the common case) ->
 		# restore UNSETS our override for byte-exact round-trip (PRD §15 zero-trace).
 		tmux set-option -g "$ORIG_WINDOW_SIZE" "$(tmux show-options -t "$lp_fit_sess" -v window-size 2>/dev/null || true)"
-		# capture the active window's height BEFORE any status change (the pin target).
+		# capture the active window's geometry (BOTH dims) BEFORE any status change
+		# (the pin target). Width MUST be pinned too: once the server reaches >=4
+		# sessions, `set-option -t driver window-size manual` reverts the driver's
+		# active window from its client-fitted width back to its creation width under
+		# aggressive-resize (default on). A height-only pin then leaves the window at
+		# e.g. 120x23 instead of 80x23, drifting the per-pane split and breaking the
+		# §23 pane-immutability invariant (Invariant C) on cancel. Pinning BOTH dims
+		# holds the pre-grow geometry byte-identical (PRD §23 / ARM C recipe).
+		lp_fit_pre_w="$(tmux display-message -p -t "$lp_fit_win" '#{window_width}' 2>/dev/null || true)"
 		lp_fit_pre_h="$(tmux display-message -p -t "$lp_fit_win" '#{window_height}' 2>/dev/null || true)"
 		# FREEZE: per-session manual (client-resized robustness), then the load-bearing
-		# height pin. NO '=' prefix on -t (set-option rejects it; show-options tolerates
-		# it — gotcha #2). NEVER -g for window-size (gotcha #3: global manual disconnects
-		# the window from the client). -t "$lp_fit_win" — the var already holds @N; do NOT
-		# prepend '@' (gotcha #4: -t "@$W" -> @@N).
+		# geometry pin (both dims). NO '=' prefix on -t (set-option rejects it;
+		# show-options tolerates it — gotcha #2). NEVER -g for window-size (gotcha #3:
+		# global manual disconnects the window from the client). -t "$lp_fit_win" —
+		# the var already holds @N; do NOT prepend '@' (gotcha #4: -t "@$W" -> @@N).
 		tmux set-option -t "$lp_fit_sess" window-size manual
-		[ -n "$lp_fit_pre_h" ] && tmux resize-window -y "$lp_fit_pre_h" -t "$lp_fit_win" 2>/dev/null || true
+		if [ -n "$lp_fit_pre_w" ] && [ -n "$lp_fit_pre_h" ]; then
+			tmux resize-window -x "$lp_fit_pre_w" -y "$lp_fit_pre_h" -t "$lp_fit_win" 2>/dev/null || true
+		elif [ -n "$lp_fit_pre_h" ]; then
+			tmux resize-window -y "$lp_fit_pre_h" -t "$lp_fit_win" 2>/dev/null || true
+		fi
 	fi
 	# (c) grow the status line count by one — NORMALIZED for tmux's on/off/2..5
 	# (do NOT use $((orig_status + 1)): "on" crashes under set -u and 1 is rejected).

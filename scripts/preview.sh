@@ -301,9 +301,12 @@ preview_main() {
 	if [ "$(opt_preview_fit)" = "clip" ] && [ -n "$cand_sess" ] \
 		&& [ -z "$(tmux list-clients -t "=$cand_sess" 2>/dev/null)" ]; then
 		cand_ws="$(tmux show-options -t "$cand_sess" -v window-size 2>/dev/null || true)"
+		cand_w="$(tmux display-message -p -t "$src_id" '#{window_width}' 2>/dev/null || true)"
 		cand_h="$(tmux display-message -p -t "$src_id" '#{window_height}' 2>/dev/null || true)"
 		tmux set-option -t "$cand_sess" window-size manual 2>/dev/null || true
-		if [ -n "$cand_h" ]; then
+		if [ -n "$cand_w" ] && [ -n "$cand_h" ]; then
+			tmux resize-window -x "$cand_w" -y "$cand_h" -t "$src_id" 2>/dev/null || true
+		elif [ -n "$cand_h" ]; then
 			tmux resize-window -y "$cand_h" -t "$src_id" 2>/dev/null || true
 		fi
 		set_state "$STATE_CAND_PIN_SESSION" "$cand_sess"
