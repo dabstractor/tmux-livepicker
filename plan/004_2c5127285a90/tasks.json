@@ -111,7 +111,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Window-level picking: flip + confirm-on-window + window-cursor",
-      "status": "Planned",
+      "status": "Researching",
       "description": "The core feature. Adds the per-candidate window-cursor state, extends preview.sh to show a chosen window, adds the next-window/prev-window input actions, and reworks confirm to land on (session, window). Depends on P1 (the bound window-axis keys fire these actions). Invariant B is the design driver: a flip links the chosen window into the driver and selects it there, never select-window on the candidate.",
       "milestones": [
         {
@@ -227,7 +227,7 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Confirm lands on (session, window) + restore keep-skip",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Rework confirm to resolve (session S, window W) from the ranked list + window-cursor, commit the window with select-window in the target, then switch-client. Also fix restore.sh STEP 2 so session keep skips the ORIG_WINDOW re-select.",
           "tasks": [
             {
@@ -263,14 +263,14 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "Restore keep skips the ORIG_WINDOW re-select",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Unify keep and keep-window so both skip the select-window -t $ORIG_WINDOW in restore.sh STEP 2. Only cancel re-selects ORIG_WINDOW. This prevents restore from yanking the client off the chosen window after confirm commits S:W.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T2.S1",
                   "title": "Unify keep/keep-window to skip STEP-2 ORIG_WINDOW re-select",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T1.S1"
@@ -290,21 +290,21 @@
           "type": "Milestone",
           "id": "P2.M3",
           "title": "Validation (window flip + confirm-on-window)",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Write test_window_flip.sh covering flip, leave-no-trace (Invariant B), confirm-on-window, cursor reset, and self-session flip.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M3.T1",
               "title": "test_window_flip.sh (flip + leave-no-trace + confirm-on-window)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Under the isolated socket + attach_test_client, test: (a) flip through a multi-window candidate's windows; (b) leave-no-trace (Invariant B: candidate's active window + window_layout unchanged); (c) confirm-on-window lands on the chosen window; (d) cursor reset across session moves; (e) self-session flip + cancel restores ORIG_WINDOW.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M3.T1.S1",
                   "title": "Write test_window_flip.sh test suite",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T3.S1",

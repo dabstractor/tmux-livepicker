@@ -97,12 +97,16 @@ restore_main() {
 	# --- STEP 2 (PRD §9 restore step 2): re-select the original window ---
 	# ORIG_WINDOW is the @N id activate saved (NOT an index — renumber-windows on).
 	# Guard on non-empty + ignore rc (ORIG_WINDOW could have vanished in a race).
-	# M1 FIX: the `keep-window` mode (window-mode confirm) SKIPS this re-select so
-	# the chosen window selection survives — the caller already switched the
-	# client to the target session and selected the target window. Re-selecting
-	# ORIG_WINDOW here would strand the client on the original window.
+	# P2.M2.T2 UNIFICATION: ONLY `cancel` re-selects ORIG_WINDOW (undoing any
+	# self-session window-flip and restoring the driver to its pre-activation
+	# window). Both `keep` (session-mode confirm — PRD §6/h3.7; the client is
+	# already on the chosen (S, W) that confirm just committed) and `keep-window`
+	# (window-mode confirm — the client is already on the chosen window) SKIP this
+	# so the client stays where the confirm put it. Re-selecting ORIG_WINDOW on
+	# `keep` would yank the client off the chosen (S, W). STEP-3's switch is
+	# cancel-only too (below) — STEP-2/STEP-3 are now a uniform cancel-only pair.
 	orig_window="$(get_state "$ORIG_WINDOW" "")"
-	if [ "${1:-}" != "keep-window" ] && [ -n "$orig_window" ]; then
+	if [ "${1:-}" = "cancel" ] && [ -n "$orig_window" ]; then
 		tmux select-window -t "$orig_window" 2>/dev/null || true
 	fi
 
