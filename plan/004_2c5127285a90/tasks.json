@@ -4,14 +4,14 @@
       "type": "Phase",
       "id": "P1",
       "title": "Two-axis key subsystem (discovery + options + binding)",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Replace the repurposed single-axis key model (window-nav keys → session-nav) with two discovered navigation axes: a window axis (discovered window-nav keys flip the previewed session's windows) and a session axis (discovered switch-client -n/-p keys + arrows move between sessions). Both axes are discovered from the user's live key tables. The new bindings are inert until P2 implements the preview/flip/confirm actions.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Options + discovery helper",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Replace the 4 old single-axis nav option accessors with 4 new two-axis accessors (empty defaults → discovery fills them), and implement the lp_discover_axis_keys helper that scans list-keys to classify and collect keys per axis+direction.",
           "tasks": [
             {
@@ -43,14 +43,14 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "lp_discover_axis_keys helper (utils.sh)",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Add a helper lp_discover_axis_keys <axis> <direction> that scans tmux list-keys -T root and -T prefix, classifies each key by its top-level command token, drops plain letters/digits and mouse keys, de-duplicates, and excludes fixed control keys. Prints the de-duplicated space-separated key list for the requested axis+direction.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Implement lp_discover_axis_keys discovery algorithm in utils.sh",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1"
@@ -71,21 +71,21 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Activate binding rework (T4)",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Rework the activate T4 key-binding block to discover and bind two axes instead of repurposing window-nav keys into session-nav. Window-axis keys → next-window/prev-window; session-axis keys → next-session/prev-session. Bind in the PRD §8 order: copy → typing → window axis → session axis → confirm/cancel/backspace → rename/delete.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Rework activate T4 to bind two axes (discovered)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "In livepicker.sh activate_main, before the copy block, resolve each axis's keys into local vars (explicit option if set non-empty, else lp_discover_axis_keys). Replace the old single-axis nav binding loops with two-axis binding: window-axis keys → next-window/prev-window; session-axis keys → next-session/prev-session. Remove the 'Discovery intentionally OMITTED' comment at line 355. The new bindings are inert until P2 implements the actions (next-window/prev-window hit the * no-op branch).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Resolve axis keys + rework T4 binding blocks in livepicker.sh",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S1",

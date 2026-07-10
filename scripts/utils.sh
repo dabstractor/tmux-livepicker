@@ -185,3 +185,99 @@ lp_client_format() {
 tmux_clear_hook() {
 	tmux set-hook -gu "$1"
 }
+
+# lp_discover_axis_keys AXIS DIR — PRD §8 h3.18 two-axis key discovery. Scans the user's
+# live `tmux list-keys -T root` + `-T prefix` and prints the space-separated keys they
+# already have bound for the requested axis+direction, so activate (P1.M2.T1.S1) can bind
+# them in the livepicker table (muscle-memory reuse). Used when the @livepicker-*-keys
+# option is unset (empty default => discover; the accessor is T1.S1).
+#
+#   AXIS = window | session ; DIR = next | prev
+#
+# PARSE (research key_discovery_findings.md FINDING 2): the bind-key line is
+#   `bind-key [-r] -T <table> <key> <command...>` — the optional -r flag + alignment
+#   spaces shift field positions, so tokenize and skip to -T, not field-index.
+#   ⚠ `set -- $line` clobbers this function's $1/$2 => axis/dir are saved to locals FIRST.
+# MOUSE EXCLUSION (FINDING 3, load-bearing): WheelDownStatus -> next-window is a TOP-LEVEL
+#   command (substring would catch it) and MouseDown3StatusLeft has switch-client -n INSIDE
+#   a display-menu block. TWO protections: (a) skip keys matching Mouse*|Wheel*; (b) the
+#   session axis matches the command EXACTLY (== "switch-client -n" or starts with it + " "),
+#   NOT as a substring — so display-menu's inner switch-client -n never matches. The window
+#   axis DOES use substring (to catch the swap-window \; select-window compound).
+# POST: drop single-char [A-Za-z0-9] (reserved for typing; keeps ) and ( ); de-dup first-seen;
+#   subtract the control-key set (confirm/cancel/backspace/rename/delete via get_opt); append
+#   the universal arrow extra for the session axis (Down/Up). ORDER is first-seen and
+#   functionally irrelevant (distinct keys bind to the same action).
+lp_discover_axis_keys() {
+	local axis="${1:-}" dir="${2:-}"
+	# save BEFORE the loop: `set -- $line` below clobbers the positional params.
+	local out="" seen=""
+	local line key cmd excl e match
+	# control-key exclude set (get_opt is defined in options.sh, sourced by the caller at
+	# call time — activate always sources options.sh first).
+	excl="$(get_opt "@livepicker-confirm-keys" "Enter") $(get_opt "@livepicker-cancel-keys" "Escape") $(get_opt "@livepicker-backspace-keys" "BSpace") $(get_opt "@livepicker-rename-key" "C-r") $(get_opt "@livepicker-delete-key" "M-BSpace")"
+
+	while IFS= read -r line; do
+		[ -z "$line" ] && continue
+		# shellcheck disable=SC2086  # intentional word-split: tokenize the bind-key line.
+		set -- $line
+		[ "${1:-}" = "bind-key" ] || continue
+		shift
+		# skip every flag (-r, and any other) until -T (handles -r + alignment uniformly)
+		while [ "$#" -gt 0 ] && [ "${1:-}" != "-T" ]; do shift; done
+		[ "${1:-}" = "-T" ] || continue
+		shift              # drop -T
+		[ "$#" -gt 0 ] && shift   # drop the table name (root/prefix)
+		[ "$#" -gt 0 ] || continue
+		key="$1"; shift
+		cmd="$*"           # rejoined command (single-space-normalized; fine for substring match)
+
+		# (b) exclude mouse/wheel keys (FINDING 3 protection 1)
+		case "$key" in Mouse*|Wheel*) continue ;; esac
+
+		# classify by axis:dir (FINDING 3: window=substring, session=EXACT top-level)
+		match=0
+		case "$axis:$dir" in
+			window:next)
+				case "$cmd" in
+					*"select-window -n"*|*"select-window -t +1"*|*"select-window -t :+1"*|*"next-window"*) match=1 ;;
+				esac ;;
+			window:prev)
+				case "$cmd" in
+					*"select-window -p"*|*"select-window -t -1"*|*"select-window -t :-1"*|*"previous-window"*) match=1 ;;
+				esac ;;
+			session:next)
+				[ "$cmd" = "switch-client -n" ] && match=1
+				if [ "$match" -eq 0 ]; then
+					case "$cmd" in "switch-client -n "*) match=1 ;; esac
+				fi ;;
+			session:prev)
+				[ "$cmd" = "switch-client -p" ] && match=1
+				if [ "$match" -eq 0 ]; then
+					case "$cmd" in "switch-client -p "*) match=1 ;; esac
+				fi ;;
+		esac
+		[ "$match" -eq 0 ] && continue
+
+		# (d) drop single-char alphanumerics (reserved for typing; KEEPS ) and ( )
+		case "$key" in [A-Za-z0-9]) continue ;; esac
+
+		# (f) exclude fixed control keys so discovery never shadows them
+		for e in $excl; do [ "$e" = "$key" ] && match=0; done
+		[ "$match" -eq 0 ] && continue
+
+		# (e) de-dup (first-seen)
+		case " $seen " in *" $key "*) continue ;; esac
+		seen="$seen $key"
+		out="$out $key"
+	done < <(tmux list-keys -T root 2>/dev/null; tmux list-keys -T prefix 2>/dev/null)
+
+	# (g) session axis: always append the universal arrow extra
+	if [ "$axis" = "session" ]; then
+		case "$dir" in next) out="$out Down" ;; prev) out="$out Up" ;; esac
+	fi
+
+	# (h) print space-separated (trim the leading space); no trailing newline callers depend on
+	out="${out# }"
+	printf '%s' "$out"
+}
