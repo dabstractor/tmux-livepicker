@@ -173,6 +173,15 @@ activate_main() {
 	tmux set-option -g "$ORIG_SESSION" "$(lp_client_format '#{session_name}')"
 	tmux set-option -g "$ORIG_WINDOW"   "$(lp_client_format '#{window_id}')"      # @N id, NOT index
 	tmux set-option -g "$ORIG_LAYOUT"   "$(lp_client_format '#{window_layout}')"
+	# P3.M2.T1.S1 (PRD §9 bullet 2 / §23): per-pane geometry snapshot of the ORIGINAL window.
+	# Restore (STEP 5, P3.M2.T1.S2) re-captures the current geometry with the IDENTICAL format
+	# and compares to this snapshot — equal => no-op (leave the window untouched, the §23-preferred
+	# path); differ => act (resize-pin size-first, then restore). Captured BEFORE the T3 status
+	# grow, so it is the true pre-mutation baseline. FORMAT IS THE CONTRACT with restore: do NOT
+	# change/sort it. set-option -g stores the multi-line list-panes output verbatim (newlines
+	# preserved, like STATE_LIST); the list-panes target is the original window's @N id (same as
+	# ORIG_WINDOW) — do NOT prepend @ (-> @@N, rc=1).
+	tmux set-option -g "$ORIG_PANE_GEOMETRY" "$(tmux list-panes -t "$(lp_client_format '#{window_id}')" -F '#{pane_id}:#{pane_left},#{pane_top},#{pane_width},#{pane_height}' 2>/dev/null)"
 	# Three ordinary option reads (orig_name == src_name -> tmux_save_opt idiom).
 	tmux_save_opt key-table key-table
 	tmux_save_opt status status

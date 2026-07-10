@@ -54,7 +54,7 @@ source "$CURRENT_DIR/state.sh"
 
 # argv[1] = 'keep' | 'cancel' (T2's branch; T1.S1's steps 1-2 do not read it).
 restore_main() {
-	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout lp_rfit_ws
+	local linked_id orig_window current_session orig_session mode r_status r_kt r_renumber r_hook hk_line hk_idx hk_cmd r_cr_hook cr_line cr_idx cr_cmd orig_layout lp_rfit_ws saved_geom cur_geom h_orig
 
 	# --- STEP 1 (PRD §9 restore step 1): unlink the preview window ---
 	# @livepicker-linked-id is empty when the self-session was the last highlight
@@ -219,18 +219,55 @@ restore_main() {
 		tmux set-hook -g "client-resized[$cr_idx]" "$cr_cmd" 2>/dev/null || true
 	done <<< "$r_cr_hook"
 
-	# --- STEP 5 (PRD §9 restore step 5): restore the original pane layout ---
-	# select-layout applies to the ACTIVE window. STEP 2 (T1.S1) already ran
-	# `select-window -t "$ORIG_WINDOW"` above, so the target window is active —
-	# T4 does NOT re-select-window (FINDING 7). ORIG_LAYOUT is the EXACT
-	# #{window_layout} string activate STEP 2 saved (e.g.
-	# "e79b,120x40,0,0[120x20,0,0,0,...]"); feed it back UNCHANGED (byte-identical
-	# round-trip — FINDING 1). BEST-EFFORT (FINDING 2): an invalid/vanished/empty
-	# layout returns rc=1 and MUST NOT block the teardown. Guard on non-empty
-	# first (defensive — get_state defaults to "" if activate failed mid-save),
-	# then `2>/dev/null || true` on the call.
-	orig_layout="$(get_state "$ORIG_LAYOUT" "")"
-	[ -n "$orig_layout" ] && tmux select-layout "$orig_layout" 2>/dev/null || true
+	# --- STEP 5 (PRD §9 restore step 5 / §23 Invariant C): DRIFT-GATED pane-geometry restore ---
+	# P3.M2.T1.S2: replace the unconditional select-layout with a drift-gated, cancel-only restore.
+	# select-layout is size-dependent and can itself MOVE panes, so it is a LAST RESORT, never
+	# routine. The common case (no drift) leaves the panes UNTOUCHED — the §23-preferred no-op
+	# ("leaving the window untouched is always preferable to moving its panes").
+	#
+	# MODE GATE (work-item §3d): only `cancel` runs the drift check. For keep/keep-window the client
+	# is already on the chosen target (NOT the original window); the original window was never the
+	# browse subject, and STEP 2 already SKIPPED re-selecting ORIG_WINDOW for keep (P2.M2.T2) — so
+	# measuring/acting on it here would be wrong. keep/keep-window SKIP STEP 5 entirely.
+	#
+	# For cancel: STEP 2 already ran `select-window -t "$ORIG_WINDOW"`, so ORIG_WINDOW IS active
+	# (select-layout below applies to the active window). Re-capture its CURRENT pane geometry with
+	# the IDENTICAL format the activate snapshot used (P3.M2.T1.S1; FORMAT IS THE CONTRACT — do NOT
+	# change/sort it) and byte-compare to ORIG_PANE_GEOMETRY:
+	#   equal  -> NO DRIFT: leave the window untouched (the §23-preferred no-op; no tmux call).
+	#   differ -> DRIFT: restore the window's exact SIZE first (`resize-window -y H_orig`; deterministic
+	#             per the P3.M1.T1.S1 gate §3 / ARM C2 — NOT a bare select-layout, which is
+	#             size-dependent and unreliable), THEN `select-layout "$ORIG_LAYOUT"` as
+	#             belt-and-suspenders (PRD §9 step 5). H_orig is DERIVED from the snapshot:
+	#             max(pane_top + pane_height) over all panes (== the pre-activate window height the
+	#             §22 clip also captured via #{window_height} at the same pre-grow moment). Both calls
+	#             BEST-EFFORT (`2>/dev/null || true`): a transient failure MUST NOT abort a
+	#             half-restored teardown (no `set -e`). STEP 6 clear_all_state runs AFTER this, so
+	#             ORIG_PANE_GEOMETRY / ORIG_LAYOUT are still readable here.
+	# DEFENSIVE: an empty snapshot (older activate pre-P3.M2.T1.S1 / capture race) has no baseline to
+	# compare -> fall through to the drift (restore) path so we do NOT regress the pre-PRP always-
+	# restore behavior for that edge (resize is skipped — h_orig not derivable — then select-layout).
+	if [ "$mode" = "cancel" ] && [ -n "$orig_window" ]; then
+		orig_layout="$(get_state "$ORIG_LAYOUT" "")"
+		saved_geom="$(get_state "$ORIG_PANE_GEOMETRY" "")"
+		cur_geom="$(tmux list-panes -t "$orig_window" -F '#{pane_id}:#{pane_left},#{pane_top},#{pane_width},#{pane_height}' 2>/dev/null)"
+		if [ -n "$saved_geom" ] && [ "$saved_geom" = "$cur_geom" ]; then
+			: # NO DRIFT — the common case. Leave the original window's panes untouched (§23).
+		else
+			# DRIFT (or no snapshot — defensive). Restore size first, then select-layout.
+			if [ -n "$saved_geom" ]; then
+				# H_orig = max(pane_top + pane_height) over the snapshot's panes.
+				# Snapshot line '#{pane_id}:#{pane_left},#{pane_top},#{pane_width},#{pane_height}'
+				# -> awk -F'[:,]' fields: $1=id $2=left $3=top $4=width $5=height -> top+height = $3+$5.
+				h_orig="$(printf '%s\n' "$saved_geom" | awk -F'[:,]' '{ h=$3+$5; if(h>max) max=h } END{ print max+0 }')"
+				if [ -n "$h_orig" ] && [ "$h_orig" -gt 0 ] 2>/dev/null; then
+					tmux resize-window -y "$h_orig" -t "$orig_window" 2>/dev/null || true
+				fi
+			fi
+			[ -n "$orig_layout" ] && tmux select-layout "$orig_layout" 2>/dev/null || true
+		fi
+	fi
+	# keep/keep-window: STEP 5 is intentionally a no-op (no else — no layout restore on the original).
 
 	# --- STEP 6 (PRD §9 restore step 6): clear picker state + unbind the table ---
 	# (a) clear_all_state (state.sh — ALREADY COMPLETE, P1.M1.T3.S1) unsets the 5

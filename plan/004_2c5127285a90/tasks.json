@@ -331,7 +331,7 @@
       "type": "Phase",
       "id": "P3",
       "title": "Pane immutability (§23): snapshot, drift-restore, verify, candidate pin",
-      "status": "Planned",
+      "status": "Ready",
       "description": "The absolute invariant: no pane of any session is ever moved or resized, even though the preview is a shared window object. This phase verifies whether freezing the candidate at link time prevents the source-view resize, implements candidate-window pinning if needed, and hardens activate/restore with a pane-geometry snapshot and drift-gated layout restore.",
       "milestones": [
         {
@@ -374,14 +374,14 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "Pane-geometry snapshot + drift-gated restore + conditional candidate pin",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Implement the pane-geometry snapshot at activate and the drift-gated restore in restore.sh STEP 5 (only select-layout if geometry drifted). Conditionally implement candidate-window pinning at link time based on P3.M1.T1's decision.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "Pane-geometry snapshot at activate + drift-gated restore",
-              "status": "Researching",
+              "status": "Ready",
               "description": "Capture a pane-geometry snapshot of the original window at activate. In restore.sh STEP 5, compare current geometry to the snapshot; only select-layout if it drifted. This is the §23 'prevent, never repair' stance.",
               "subtasks": [
                 {
@@ -402,7 +402,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S2",
                   "title": "Drift-gated restore in restore.sh STEP 5",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M2.T1.S1"
@@ -420,14 +420,14 @@
               "type": "Task",
               "id": "P3.M2.T2",
               "title": "Candidate-window pinning at link time (CONDITIONAL on P3.M1.T1)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Only if pane_immutability_verification.md says candidate pinning holds the invariant. When linking a non-self candidate window, freeze the candidate's window-size + pin its geometry before the link, and restore on unlink. If P3.M1.T1 decided pinning is infeasible, this task is a no-op and snapshot is the documented contract.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T2.S1",
                   "title": "Pin candidate at link time + restore on unlink (conditional)",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M1.T1.S1",
@@ -449,21 +449,21 @@
           "type": "Milestone",
           "id": "P3.M3",
           "title": "Validation (§23 pane immutability)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Write test_pane_immutability.sh covering Invariant C with a real client: no candidate pane movement, no status-grow reflow, no confirm side-effects, original window intact.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M3.T1",
               "title": "test_pane_immutability.sh (Invariant C, real client)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Under the isolated socket + attach_test_client, assert pane geometry is byte-identical across flip+cancel, status-grow, confirm, and original-window cycles.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M3.T1.S1",
                   "title": "Write test_pane_immutability.sh Invariant C test suite",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M2.T1.S2",

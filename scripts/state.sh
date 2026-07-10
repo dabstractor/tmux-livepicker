@@ -59,6 +59,7 @@ readonly STATE_PREVIEW_WIN_ID="@livepicker-preview-win-id"      # the window cur
 readonly ORIG_SESSION="@livepicker-orig-session"
 readonly ORIG_WINDOW="@livepicker-orig-window"                         # window ID, NOT index
 readonly ORIG_LAYOUT="@livepicker-orig-layout"                         # window_layout string
+readonly ORIG_PANE_GEOMETRY="@livepicker-orig-pane-geometry"           # per-pane geometry of the original window (PRD §9 bullet 2 / §23 Invariant C); restore compares to detect drift, acts only if changed; auto-cleared by clear_all_state's grep '@livepicker-orig-'
 readonly ORIG_KEY_TABLE="@livepicker-orig-key-table"
 readonly ORIG_STATUS="@livepicker-orig-status"                         # status line-count value
 readonly ORIG_RENUMBER="@livepicker-orig-renumber-windows"
