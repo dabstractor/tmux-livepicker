@@ -9,7 +9,8 @@ tmux-livepicker turns the status bar into a fuzzy picker. While the picker is
 active the status bar grows to two lines: line 1 is the candidate list, and the
 area below it shows a live, all-panes preview of the highlighted candidate. You
 filter by typing and move the selection with your usual window-navigation keys.
-Confirming lands you on the chosen session (optionally creating a new one from
+Confirming lands you on the chosen session **and the exact window being
+previewed**, not just the session (optionally creating a new one from
 your filter query); cancelling restores your status line, key table, and focus
 exactly. Browsing **never** switches your session, so it does not corrupt the
 [tmux-session-history](https://github.com/dabstractor/tmux-session-history)
@@ -166,7 +167,8 @@ Line 1 of the status bar is the picker. Its layout is the same for both `plain` 
    own `next-window` / `previous-window` bindings) flip its windows live. Line
    2's window-status follows the flip. The session's own active window is
    untouched — you are only looking.
-5. **Confirm:** `Enter` lands on the selection, or creates a session from
+5. **Confirm:** `Enter` lands on the chosen session **and the exact window
+   being previewed** (not just the session), or creates a session from
    your query in `session` mode with no match.
 6. **Cancel:** `Escape` clears the query if non-empty, otherwise cancels and
    restores everything exactly.

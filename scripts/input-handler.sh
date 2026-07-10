@@ -602,10 +602,69 @@ input_main() {
 				# (keep-window skips restore STEP-2's ORIG_WINDOW re-select).
 				"$CURRENT_DIR/restore.sh" keep-window
 				else
-					# Session mode: the helper unlinks the driver preview BEFORE
-					# switch-client (FINDING 1/2 — load-bearing), switches once,
-					# and tears down with restore keep.
-					_confirm_land_on_session "$target"
+					# Session mode (PRD §6 Confirm / h3.7 + §4 Invariant B). Commit the chosen
+					# WINDOW W in S, then the one session switch, then restore keep. W is resolved
+					# AUTHORITATIVELY from the window-cursor state (NOT the possibly-lagged preview
+					# link — PRD §18 contract #4): the window currently previewed/flipped for S,
+					# defaulting to S's active window when no flip occurred.
+					local S="$target"
+					# Resolve W (mirror the flip branch's lazy-derive). STATE_CAND_WIN_LIST is
+					# non-empty ONLY when the user flipped windows on S (P2.M1.T3.S2 invalidates it
+					# on every move/filter change; the flip re-binds SESSION=S + populates LIST).
+					local cand_win_sess cand_list cand_cursor W
+					local -a _cwin=()
+					cand_win_sess="$(get_state "$STATE_CAND_WIN_SESSION" "")"
+					cand_list="$(get_state "$STATE_CAND_WIN_LIST" "")"
+					cand_cursor="$(get_state "$STATE_CAND_WIN_CURSOR" "0")"
+					[[ "$cand_cursor" =~ ^[0-9]+$ ]] || cand_cursor=0
+					W=""
+					if [ "$cand_win_sess" = "$S" ] && [ -n "$cand_list" ]; then
+						mapfile -t _cwin < <(printf '%s\n' "$cand_list")
+						if [ "$cand_cursor" -ge 0 ] && [ "$cand_cursor" -lt "${#_cwin[@]}" ]; then
+							W="${_cwin[$cand_cursor]}"
+						fi
+					fi
+					# No flip (LIST empty) / stale cache / cursor out of range -> S's ACTIVE window.
+					if [ -z "$W" ]; then
+						W="$(tmux list-windows -t "=$S" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
+					fi
+					orig_session="$(get_state "$ORIG_SESSION" "")"
+					if [ "$S" = "$orig_session" ]; then
+						# SELF-SESSION (PRD §6: S == ORIG_SESSION). NO switch-client. The single
+						# select-window -t "$W" (a DRIVER window @id) is the whole commit. Drop a
+						# prior CROSS-session preview link ONLY when linked_id is set AND != W (a
+						# non-self candidate previewed earlier can leave a foreign link).
+						if [ -n "$W" ]; then
+							tmux select-window -t "$W" 2>/dev/null || true
+						fi
+						linked_id="$(get_state "$STATE_LINKED_ID" "")"
+						if [ -n "$linked_id" ] && [ "$linked_id" != "$W" ] && [ -n "$orig_session" ]; then
+							tmux unlink-window -t "$orig_session:$linked_id" 2>/dev/null || true
+						fi
+						"$CURRENT_DIR/restore.sh" keep
+					else
+						# NON-SELF (PRD §6/h3.7). (1) Commit W in S — the single deliberate candidate
+						# mutation (Invariant B); select-window -t "=$S:@id" is verified on 3.6b
+						# (external_deps.md §1), no fallback. (2) Unlink the DRIVER's preview link
+						# BEFORE the switch (mirror _confirm_land_on_session's H2-hardened unlink:
+						# target ORIG_SESSION, NOT the post-switch session; only unlink when the
+						# driver retains another window). (3) switch-client -t "=$S" (the one switch;
+						# the client lands on S:W — W is already active in S). (4) restore keep.
+						if [ -n "$W" ]; then
+							tmux select-window -t "=$S:$W" 2>/dev/null || true
+						fi
+						linked_id="$(get_state "$STATE_LINKED_ID" "")"
+						if [ -n "$linked_id" ] && [ -n "$orig_session" ]; then
+							local drv_wins drv_active
+							drv_wins="$(tmux list-windows -t "=$orig_session" 2>/dev/null | wc -l)"
+							drv_active="$(tmux list-windows -t "=$orig_session" -F '#{window_id}' -f '#{window_active}' 2>/dev/null)"
+							if [ "$drv_wins" -gt 1 ] || [ "$drv_active" != "$linked_id" ]; then
+								tmux unlink-window -t "$orig_session:$linked_id" 2>/dev/null || true
+							fi
+						fi
+						tmux switch-client -t "=$S" 2>/dev/null || true
+						"$CURRENT_DIR/restore.sh" keep
+					fi
 				fi
 				return 0
 			fi

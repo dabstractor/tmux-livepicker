@@ -227,21 +227,21 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Confirm lands on (session, window) + restore keep-skip",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Rework confirm to resolve (session S, window W) from the ranked list + window-cursor, commit the window with select-window in the target, then switch-client. Also fix restore.sh STEP 2 so session keep skips the ORIG_WINDOW re-select.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "Confirm resolves (S, W) and commits the window",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Rework the confirm branch to resolve W from STATE_CAND_WIN_CURSOR, commit it with select-window -t '=$S:$W', unlink the driver's preview link, then switch-client. Self-session skips the switch-client.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Rework confirm session-mode to commit window + self-session path",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S1",
@@ -263,14 +263,14 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "Restore keep skips the ORIG_WINDOW re-select",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Unify keep and keep-window so both skip the select-window -t $ORIG_WINDOW in restore.sh STEP 2. Only cancel re-selects ORIG_WINDOW. This prevents restore from yanking the client off the chosen window after confirm commits S:W.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T2.S1",
                   "title": "Unify keep/keep-window to skip STEP-2 ORIG_WINDOW re-select",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T1.S1"
