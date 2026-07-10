@@ -338,21 +338,21 @@
           "type": "Milestone",
           "id": "P3.M1",
           "title": "Empirical verification of candidate-window pinning (gates code)",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Verify on tmux 3.6b with a real client whether freezing the candidate's window-size at link time prevents the shared-window resize from disturbing the source view. This GATES P3.M2.T2 (the candidate-pin code).",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Verify candidate pinning on 3.6b with a real client",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Build on clip_verification.md §4 (which proved the link-time resize + source disturbance). On the isolated socket with attach_test_client, link a candidate window, freeze the candidate's window-size + pin geometry, and assert the source view no longer changes. Record the decision.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Run candidate-pinning verification probe + record findings",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T2.S1"
