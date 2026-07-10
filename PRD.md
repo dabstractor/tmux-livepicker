@@ -25,9 +25,15 @@ When activated, the status bar grows to two lines: line 1 becomes the session
 picker (sessions shown where windows normally are), and the user's normal window
 status drops to line 2. The full area below the status bar becomes a live
 preview of the currently highlighted session, showing all of its panes in their
-real layout. The user filters by typing and moves through sessions with the same
-keys they normally use to move between windows. Confirming lands on the chosen
-session; cancelling restores everything exactly.
+real layout. The user filters by typing, moves between **sessions** with their
+session-nav keys (discovered from their config — for this user `)` / `(` plus the
+arrow keys), and flips through the highlighted session's **windows** with the
+same window-nav keys they use every day (`Ctrl-M-Tab` / `Ctrl-M-BTab` and
+siblings), so they can visually locate their work among dozens of window tabs
+spread across many sessions without ever leaving their seat. Confirming lands on
+the chosen session **and window**; cancelling restores everything exactly —
+including every previewed session's active window and pane layout, as if the
+picker was never opened (sections 4 and 23).
 
 The result is a session switcher that is faster and richer than a popup picker,
 keeps the user oriented, and never corrupts session history or the toggle.
@@ -46,21 +52,36 @@ keeps the user oriented, and never corrupts session history or the toggle.
 - Interaction feedback first: the status line redraws and the highlight moves
   the instant a key is pressed; the live preview is deferred (it is inherently
   slow) and must never block typing, navigation, or confirm (section 18).
-- Filter by typing; move through the list with the user's own window-nav keys.
+- Two-axis navigation: move between sessions with the session-nav keys; flip
+  through the highlighted session's **windows** with the user's own window-nav
+  keys, with the live preview following each flip. This lets the user visually
+  locate their work across dozens of window tabs spread over many sessions
+  without leaving their seat.
+- Filter by typing.
+- Confirm lands on the chosen **session and window** — the exact tab being
+  previewed — not just the session.
+- Leave-no-trace while browsing: flipping a candidate's windows never changes
+  that candidate's active window, and never moves, resizes, or otherwise alters
+  any pane in any session. Moving to another session, or cancelling, snaps every
+  candidate back to its original state — active window and pane layout intact
+  (sections 4 and 23).
 - Reserve every plain letter and digit for the query: navigation, confirm,
   cancel, and backspace use only non-alphanumeric keys, so typing can use the
   full `a`-`z`, `A`-`Z`, `0`-`9` range.
 - Create a new session from the typed query when nothing matches, optionally
   opening it in the directory `zoxide` resolves for the query.
 - Zero pollution of session history and the session toggle while browsing.
-- Full, exact restoration of status layout, key table, and focus on exit.
+- Full, exact restoration of status layout, key table, focus, and pane geometry
+  on exit.
 
 ### Non-goals
 
 - A floating popup UI. The picker is on the status line.
-- Previewing more than one window of a session at a time. The preview shows the
-  candidate's active window with all its panes.
-- Pane-level picking. Sessions and windows only.
+- Previewing more than one window of a session at once. The preview shows one
+  window (all its panes) at a time; the user flips between a session's windows
+  one at a time.
+- Pane-level picking. The picker selects sessions and windows, never individual
+  panes.
 - Recency or MRU (time-based) ordering. The empty-query order stays tmux
   default; with a query active, sessions are reordered by fuzzy similarity
   (section 20), never by access time.
@@ -71,12 +92,24 @@ keeps the user oriented, and never corrupts session history or the toggle.
 - I press the activation key. The status bar becomes two lines; the area below
   shows my current session's panes live; the picker lists my sessions with the
   current one highlighted.
-- I press my next-window key. The highlight moves to the next session and the
-  preview below switches to show that session's panes, live. My history and
-  toggle are untouched.
+- I press my session-nav key (`)` or `Down`). The highlight moves to the next
+  session and the preview below switches to show that session's active window,
+  live. My history and toggle are untouched.
+- While previewing a session, I press my window-nav key (`Ctrl-M-Tab`). The
+  preview flips to that session's next window tab — live — and that window's
+  name lights up on line 2 of my status bar. The session's *own* active window
+  is unchanged; I'm only looking. I flip through a dozen tabs in a second to
+  find the one I want.
+- I press Enter. The picker closes and I land in that session **on the exact
+  window I was previewing**.
+- I change my mind and move to a different session, or I press Escape. The
+  session I was flipping through snaps back to whichever window it was on
+  before I touched it — no tab moved, no pane resized — as though I was never
+  there.
 - I type `log`. The list filters to matching sessions; the preview follows the
   top match.
-- I press Enter on a match. The picker closes and I am in that session.
+- I type a query, press Enter on the top match. The picker closes and I am in
+  that session on the window I was previewing.
 - I type `newproj`, see no matches, press Enter. A session named `newproj` is
   created and I am in it. With zoxide mode on, it opens in the directory zoxide
   resolves for `newproj`.
@@ -88,7 +121,9 @@ keeps the user oriented, and never corrupts session history or the toggle.
   seeing a preview. The status line kept up with every keystroke and Enter did
   not wait on a preview (section 18).
 - I press Escape. The picker closes, my status bar is one line again, and I am
-  exactly where I was. My window-nav keys move windows again.
+  exactly where I was — same session, same window, every pane where I left it.
+  Every session I peeked at is likewise untouched. My window-nav keys move
+  windows again.
 - I open the picker. My status bar shows just my session tabs where windows
   normally are, justified the way my theme sets them (centred, for me). There is
   no search box, no `query>` label, no index/total numbers — nothing extra until
@@ -127,6 +162,29 @@ and selecting it (section 7). The client stays in its session.
 `client-session-changed` does not fire while browsing, so history and toggle are
 untouched. The only session switch happens once, at confirm.
 
+Section 4 names the headline rule; the full set of invariants the plugin must
+uphold is:
+
+- **Invariant A — no client session switch while browsing.** Browsing never
+  calls `switch-client`. The only switch is the single one at confirm. (Above.)
+- **Invariant B — no candidate state mutation while browsing.** Browsing never
+  changes any candidate session's active window, and never moves, resizes, or
+  alters any of its panes. Flipping a candidate's windows links the chosen
+  window into the driver and selects it *there*; it never calls `select-window`
+  on the candidate itself, so the candidate's active window is invariant, and
+  the shared window is never reflowed (section 7, section 23). Moving to
+  another session or cancelling therefore leaves every candidate exactly as it
+  was — "leave no trace."
+- **Invariant C — pane immutability.** No pane of any session — candidate,
+  driver, or bystander — is moved, resized, reordered, reset, or has any
+  property altered by browsing, confirming, or cancelling, even though the
+  preview is a shared window object. Enforced by prevention, not repair: there
+  is no reliable after-the-fact undo (section 23).
+
+Confirm is the one place a candidate's state changes by design: a single
+`select-window` commits the chosen window as the candidate's active window, and
+a single `switch-client` moves the client onto it. Everything else is read-only.
+
 ## 5. Architecture
 
 Three subsystems compose:
@@ -139,13 +197,16 @@ Three subsystems compose:
   `index/total` count indicator is gone. The user's existing status (windows)
   drops to line 2. Full layout spec: section 19; ranking: section 20.
 - **Modal key table.** A dedicated `livepicker` key table receives all input
-  while the picker is active. It binds typing, filtering, navigation, confirm,
-  and cancel. Because only this table is consulted while active, any key bound
-  here is automatically "repurposed" for the duration and reverts for free when
-  the table is switched back (section 8).
+  while the picker is active. It binds typing, filtering, the two navigation
+  axes (session-nav and window-nav), confirm, cancel, and the management keys.
+  Because only this table is consulted while active, any key bound here is in
+  effect for the duration and reverts for free when the table is switched back
+  (section 8).
 - **Live preview.** A separate preview routine links the highlighted session's
-  active window into the current session and selects it, so all its panes show
-  live in the area below the status bar (section 7).
+  *chosen* window (its active window by default; whichever window the user has
+  flipped to otherwise) into the current session and selects it there, so all
+  its panes show live in the area below the status bar. It never touches the
+  candidate session's own active window or panes (section 7, Invariant B/C).
 
 State is held in `@livepicker-*` tmux options for the duration of the picker and
 cleared on exit.
@@ -164,23 +225,25 @@ scripts/livepicker.sh (activate)
   |- capture client width into @livepicker-client-width; install client-resized hook (section 19)
   |- freeze driver window-size=manual (@livepicker-preview-fit clip; section 22)
   |- grow status to 2 lines; install picker renderer on line 1
-  |- switch key-table to livepicker; bind input keys (incl. repurposed window keys
-  |    + rename/delete management keys, section 21)
-  |- set initial selection (index 0, scroll 0); run first preview
+  |- switch key-table to livepicker; bind input keys (two-axis nav discovered
+  |    from the user's config + rename/delete management keys, section 8/21)
+  |- set initial selection (index 0, scroll 0, window-cursor = current session's
+  |    active window); run first preview
 
 scripts/input-handler.sh <action> [arg]
-  |- type / backspace: update @livepicker-filter; rank; reset index=0 + scroll=0; refresh status FIRST, then defer a preview to the top match (section 18)
-  |- next-session / prev-session: move @livepicker-index; refresh status FIRST (highlight moves); scroll-into-view (section 19); defer the preview
-  |- confirm: resolve target from ranked list; create if needed; switch-client once; restore
-  |- cancel: clear the query (reset index+scroll); or restore everything if query already empty
+  |- type / backspace: update @livepicker-filter; rank; reset index=0 + scroll=0 + window-cursor=candidate active window; refresh status FIRST, then defer a preview to the top match (section 18)
+  |- next-session / prev-session: move @livepicker-index; refresh status FIRST (highlight moves); scroll-into-view (section 19); reset window-cursor to the new candidate's active window; defer the preview
+  |- next-window / prev-window: advance @livepicker-cand-win-cursor within the current candidate's window list (wrapping); defer a re-link of the chosen window (section 18); refresh -S so line 2's window-status follows the flip
+  |- confirm: resolve (session, window) from ranked list + window-cursor; create if needed; switch-client once + one select-window to land on the window; restore
+  |- cancel: clear the query (reset index+scroll+window-cursor); or hard-reset everything if query already empty
   `- rename / delete: delegate to scripts/session-mgmt.sh (section 21)
 
 scripts/session-mgmt.sh <rename|delete|do-rename|do-delete> [arg]
   `- rename via tmux command-prompt; delete via kill-session (optionally confirm-before);
      guards (driver/last-session/linked-window leak); rewrite list + re-rank + re-sync preview
 
-scripts/preview.sh <session>
-  `- link candidate active window into current session; select it (all panes live)
+scripts/preview.sh <session> [window-id]
+  `- link the candidate's CHOSEN window (active window, or the window the user flipped to) into the current session and select it THERE (all panes live). Never select-window on the candidate; never resize/mutate its panes (Invariant B/C).
 
 scripts/renderer.sh
   `- #() status command: query bar (far left) + ranked tabs in a scroll viewport + overflow indicators (section 19/20); re-evaluated ASYNC by the server on refresh-client -S (never blocks the keystroke). Reads dynamic state (list/filter/index/scroll/width) live; caches static config once at activation (@livepicker-render-cache) and measures tab width fork-free, so the redraw stays within the section 16 budget (~60ms on a ~15-session list)
@@ -202,7 +265,9 @@ scripts/restore.sh <keep|cancel>
 4. Grow the status bar to two lines and install the renderer (section 7 of the
    status setup below).
 5. Switch `key-table` to `livepicker` and bind input keys (section 8).
-6. Set the initial selection to the current session and run the first preview.
+6. Set the initial selection to the current session (index 0, scroll 0) and the
+   window cursor to the current session's active window, then run the first
+   preview.
 7. Set `@livepicker-mode on`.
 
 ### Filtering and ranking
@@ -228,30 +293,71 @@ on `link-window`/`select-window` (section 18).
 
 The typeable set is the full `a`-`z`, `A`-`Z`, `0`-`9` plus `-_. /`. Because the
 key table is modal (section 8), a key bound to a non-typing action is
-intercepted and cannot be typed; navigation, confirm, cancel, backspace, and
-the management keys (rename/delete) are therefore constrained to
-non-alphanumeric keys (arrows, `C-M-Tab`/`C-M-BTab`, `Enter`, `Escape`,
-`BSpace`, `C-r`, `M-BSpace`).
+intercepted and cannot be typed; the session-nav, window-nav, confirm, cancel,
+backspace, and management keys (rename/delete) are therefore constrained to
+non-alphanumeric keys (arrows, `)`/`(`, `C-M-Tab`/`C-M-BTab`, `M-n`/`M-p`,
+`C-n`/`C-p`/`C-l`/`C-h`, `Enter`, `Escape`, `BSpace`, `C-r`, `M-BSpace`).
 
 ### Session navigation
 
 `next-session` and `prev-session` move `@livepicker-index` within the ranked
 list (wrapping). After the move, the handler runs the **scroll-into-view** rule
 (section 19): if the new highlight falls outside the viewport, advance/retreat
-`@livepicker-scroll` until the highlighted tab is visible. Each move redraws
-the status immediately; the preview re-sync is deferred to the background so
-the highlight tracks the keypress with no lag (section 18). Navigation must not
-call `switch-client`.
+`@livepicker-scroll` until the highlighted tab is visible. Entering a new
+candidate also **resets the window cursor** to that candidate's current active
+window (every candidate starts previewed on its own active window; per-candidate
+flip history is not remembered across session moves — Invariant B). Each move
+redraws the status immediately; the preview re-sync (link the new candidate's
+active window) is deferred to the background so the highlight tracks the
+keypress with no lag (section 18). Navigation must not call `switch-client`.
+
+### Window navigation (flip within the previewed session)
+
+`next-window` and `prev-window` flip through the **windows of the currently
+highlighted session**, advancing `@livepicker-cand-win-cursor` within that
+session's ordered window list (wrapping; the list comes from
+`list-windows -t "=$S" -F '#{window_id}'`, re-derived when the candidate
+changes). The chosen window is then shown in the preview by the same link-into-
+driver mechanism (section 7): unlink the previous linked window (if any) from
+the driver, link the chosen window into the driver, and `select-window` it
+**there**. This is the load-bearing leave-no-trace rule: the flip never calls
+`select-window` on the candidate session, so the candidate's own active window
+and pane layout never change (Invariant B/C). The re-link is deferred and
+supersedeable exactly like a session-nav preview (section 18). The flip does
+not change line 1 (the session tabs are unchanged), but it calls
+`refresh-client -S` so line 2 — the user's normal window-status — updates to
+show the newly active (linked) window's name; that is the only indicator the
+user needs for which tab they are on.
+
+Self-session note: when the highlighted session is the driver itself, there is
+nothing to link (its windows already live there); `next-window`/`prev-window`
+then `select-window` among the driver's own windows. That *does* move the
+driver's active window while browsing, but cancel is a hard reset that restores
+`ORIG_WINDOW`, and the panes are never resized (Invariant C); see section 23.
 
 ### Confirm
 
-Resolve the target from the ranked list (section 20) at the current index.
+Resolve the target **session** `S` from the ranked list (section 20) at the
+current index, and the target **window** `W` from `@livepicker-cand-win-cursor`
+(the window currently being previewed for that session; for the self-session or
+for `snapshot`/`off` preview modes with no chosen window, `W` is the session's
+active window).
 
-- If a target exists: `switch-client -t "=target"`. One switch. This is the only
-  session switch in the whole flow.
+- If a target session `S` exists:
+  - **Commit the window choice in `S`** with one `select-window -t "=$S:$W"`
+    (this is the single, deliberate mutation of a candidate — Invariant B).
+    Verify the window-id addressing form on the target tmux; if `=$S:@id` is
+    not accepted, `switch-client` to `S` first and then `select-window -t "@id"`.
+  - **Tear down the driver's preview link** (unlink `ORIG_SESSION:$linked_id`)
+    exactly as today, targeting `ORIG_SESSION` explicitly — not the post-switch
+    current session (mirror the existing confirm unlink discipline).
+  - `switch-client -t "=$S"` — the one session switch; the client lands on `S:W`.
+  - If `S == ORIG_SESSION` (self): skip the `switch-client`; the single
+    `select-window -t "$W"` is the whole commit.
 - If the ranked list is empty, the type is `session`, and `@livepicker-create`
-  is on: create a session from the query, then `switch-client` to it. If
-  creation fails (invalid name), cancel instead.
+  is on: create a session from the query, then `switch-client` to it (a brand-
+  new session has one window, so there is no window choice). If creation fails
+  (invalid name), cancel instead.
   - Default: `tmux new-session -d -s "<query>"`.
   - With `@livepicker-zoxide-mode` on (mirrors tmux-sessionx's
     `@sessionx-zoxide-mode`): resolve the query through zoxide and start the
@@ -259,18 +365,30 @@ Resolve the target from the ranked list (section 20) at the current index.
     `tmux new-session -d -s "<query>" -c "$z_target" -n "$z_target"`. If zoxide
     returns nothing (dir unindexed, below its frecency threshold, or zoxide
     absent), fall back to the default create above rather than `-c ""`.
-- If the type is `window`: `select-window -t "<session>:<window>"`. No new
-  session creation in window mode.
+- If the type is `window`: `select-window -t "<session>:<window>"` (no new
+  session creation in window mode).
 
 Then run `restore.sh keep`, which tears down the picker but leaves the client on
-the chosen target.
+the chosen `(S, W)` and does **not** re-select `ORIG_WINDOW` or switch back.
 
 ### Cancel
 
-Run `restore.sh cancel`: unlink the preview, restore the saved status layout and
-key table, `select-window` back to the original window, and (because cancel is
-not a navigation) `switch-client` back to the original session. Clear all
-`@livepicker-*` state.
+Run `restore.sh cancel` — a **hard reset**, regardless of how many sessions were
+previewed or how many windows were flipped:
+
+1. Unlink the driver's preview window if `@livepicker-linked-id` is set.
+2. `select-window -t "$ORIG_WINDOW"` — restore the driver's original window
+   (this also undoes any self-session window-flip).
+3. `switch-client -t "=$ORIG_SESSION"` — return the client to its original
+   session (cancel is not a navigation).
+4. Restore `status`, every `status-format[n]`, `renumber-windows`, `key-table`,
+   the hooks, and the driver's `window-size`; clear all `@livepicker-*` state.
+
+Every **non-self** candidate is already pristine — its active window was never
+changed and its panes were never touched (Invariant B/C, enforced by the
+link-only preview mechanism), so cancel needs no per-candidate work. The result
+is exactly the pre-activation state: same session, same window, every pane where
+it was, every peeked session untouched.
 
 ### Scrolling and overflow (status layout)
 
@@ -306,47 +424,67 @@ typing set.
 
 ## 7. The preview subsystem (live, all panes)
 
-This is the defining feature. It must show the candidate session's active window
-with all of its panes, live, in the area below the status bar, without switching
-sessions.
+This is the defining feature. It must show a window of the candidate session —
+its active window by default, or whichever window the user has flipped to — with
+all of that window's panes, live, in the area below the status bar, without
+switching sessions and without changing the candidate's own active window or
+moving any of its panes (Invariant B/C).
 
 This section describes *how* a preview is produced. Section 18 specifies *when*:
 previews are deferred relative to input, so they never block typing or
 navigation.
 
-### Mechanism: link-window plus select-window
+### Mechanism: link-window plus select-window (on the driver only)
 
 A tmux window can be linked into more than one session. A linked window is the
 same window object: it renders all of its panes, live, and keeps the same global
-window id everywhere it appears.
+window id everywhere it appears. Crucially, each session tracks its **own**
+active window independently — selecting a window in one session does not change
+any other session's active window. The preview exploits exactly that: it shows a
+candidate window by linking it into the driver and selecting it **in the
+driver**, never in the candidate.
 
-To preview candidate session `S`:
+To show window `W` of candidate session `S` (`W` defaults to `S`'s active
+window, and is whatever window the user has flipped to otherwise):
 
 ```
-update_preview S:
-    if S == current_session:
-        tmux select-window -t "$ORIG_WINDOW"      # show own session, no link
+show_window S, W:
+    if S == ORIG_SESSION (driver/self):
+        tmux select-window -t "$W"              # W already lives here; just select it
+        LINKED_ID = ""                          # nothing linked for self
         return
-    src_id = active window id of S:
-        tmux list-windows -t "=$S" -F '#{window_id}' -f '#{window_active}'
+    # non-self candidate: link W into the DRIVER and select it THERE.
     if a previous linked preview exists (track $LINKED_ID):
-        tmux unlink-window -t "$CURRENT_SESSION:$LINKED_ID"   # remove from cur; S keeps it
-    tmux link-window -a -s "$src_id" -t "$CURRENT_SESSION:"  # link into cur session
-    tmux select-window -t "$src_id"                            # show it (all panes, live)
-    LINKED_ID = src_id
+        tmux unlink-window -t "$ORIG_SESSION:$LINKED_ID"   # drop prior link; S keeps its window
+    tmux link-window -s "$W" -t "$ORIG_SESSION:"           # link W into the driver
+    tmux select-window -t "$W"                              # show it in the driver (all panes, live)
+    LINKED_ID = W
+    # NOTE: nothing above targets S. S's active window and panes are untouched.
 ```
 
 Notes for the implementer:
 
-- The linked window's id equals the source window's id. Track that id; it is the
-  handle for unlinking on the next navigation and on exit.
-- `unlink-window` removes the window from the current session only. The source
-  session keeps its window. Never pass `-k` (that would destroy the window when
-  it is linked in only one session; here it is always linked in `S` too).
-- Window ids are server-global and survive `renumber-windows on`, so indexing
-  churn does not matter. Address windows by id, never by index.
-- Use `-t "=S"` (the `=` prefix) for exact session-name matching when reading
-  `S`'s active window, to avoid target ambiguity.
+- The linked window's id equals the source window's id. Track that id
+  (`LINKED_ID`); it is the handle for unlinking on the next navigation and on
+  exit.
+- `unlink-window` removes the window from the driver only. The candidate keeps
+  its window. Never pass `-k` (that would destroy the window when it is linked
+  in only one session; here it is always linked in `S` too).
+- Window ids are server-global and survive `renumber-windows on`. Address
+  windows by id, never by index. `W` is resolved from
+  `list-windows -t "=$S" -F '#{window_id}'` (ordered, for flipping) or with
+  `-f '#{window_active}'` (for the default).
+- Use `-t "=S"` (the `=` prefix) for exact session-name matching.
+- **Leave-no-trace (Invariant B):** `show_window` never calls `select-window`,
+  `resize-window`, or any layout/pane command on `S`. The candidate's active
+  window is therefore whatever it was before the user started browsing, and its
+  panes never move. This is what makes "select a different session, or cancel →
+  the candidate snaps back to its original window" true for free.
+- **Pane immutability (Invariant C):** because `W` is shared, anything that
+  resizes it in the driver resizes it in `S` too, and **permanently** (verified:
+  `unlink-window` does not roll it back). `show_window` links and selects only;
+  the driver must be pinned so it cannot reflow `W`. See section 23 for the full
+  prevention regime.
 
 ### Fallbacks
 
@@ -359,9 +497,12 @@ Notes for the implementer:
 
 ### Self-session edge case
 
-When the highlighted session is the current session, do not link (a session
-cannot link its own window into itself). Select the original window so the user
-sees their own session as the preview.
+When the highlighted session is the driver itself, do not link (a session cannot
+link its own window into itself). `show_window` just `select-window`s among the
+driver's own windows — the default is `ORIG_WINDOW`, and window-nav flips through
+the driver's other windows. Flipping here moves the driver's active window while
+browsing (unlike a non-self candidate), but cancel is a hard reset back to
+`ORIG_WINDOW` and the panes are never resized (Invariant C; section 23).
 
 ### Side effects to suppress
 
@@ -383,46 +524,85 @@ not guaranteed across tmux versions. The implementing agent should verify the
 fallthrough behavior; if keys do pass through, bind common keys comprehensively
 so input cannot reach the previewed session's panes.
 
-### Sizing: clip, don't reflow
+### Sizing: clip, don't reflow (and never mutate panes — section 23)
 
 The live preview is a shared, linked window (above). When the status grows to
 two lines (section 10) the client pane area shrinks by one row; by default
 (`@livepicker-preview-fit clip`, section 22) the driver's `window-size` is set
 to `manual` first, so the preview window keeps its full height and its bottom
-row is **clipped** instead of reflowed — eliminating the status-grow jank. The
-window's panes are never resized on the typing/nav path. See section 22 for the
-mechanism, the `reflow` fallback, and the empirical verification it requires.
+row is **clipped** instead of reflowed. Because the window is shared, a reflow
+would move the candidate's panes too — so clipping is not merely a jank fix, it
+is a correctness requirement (Invariant C). The window's panes must never be
+resized on any path — typing, session-nav, or window-nav. Section 22 gives the
+mechanism and the `reflow`/`snapshot` fallbacks; section 23 states the absolute
+pane-immutability invariant, the prevention regime, and the empirical
+verification it requires.
 
-## 8. The repurposed-key subsystem
+## 8. The key subsystem (two-axis navigation, discovered)
 
-Requirement: the user's existing next-window and previous-window keys become
-next-session and previous-session keys while the picker is active, and revert
-when it closes.
+The picker has two navigation axes, and **both reuse the keys the user already
+has bound for that axis**, discovered from their live key tables:
+
+- **Session axis** — move the highlight between candidate sessions. Defaults to
+  the user's session-nav keys (`switch-client -n` / `-p`) plus the arrow keys.
+- **Window axis** — flip through the highlighted session's windows in the
+  preview. Defaults to the user's window-nav keys (`next-window` /
+  `previous-window` / `select-window -n` / `-p`, including the
+  `swap-window … \; select-window …` compounds).
+
+The window-nav keys keep doing window navigation — just scoped to the previewed
+session. They are **not** repurposed into session-nav (an earlier design did
+that; it fought the user's muscle memory and is dropped). Confirm, cancel,
+backspace, and the rename/delete management keys are the only other keys bound.
 
 ### Why this is low-cost
 
-The picker already uses a modal key table. While `key-table` is `livepicker`,
-tmux consults only that table. Binding the user's window-nav keys in it makes
-them act as session-nav for the duration. On exit, `key-table` returns to its
-original value (typically `root`), and the user's original window-nav bindings
-take over again. No binding save or restore is needed for the revert.
+The picker uses a modal key table. While `key-table` is `livepicker`, tmux
+consults only that table, so binding these keys there takes effect for the
+duration and reverts for free when the table is switched back to its original
+value (typically `root`). No per-key save/restore is needed for the revert.
 
-### Keys
+### Discovery
 
-This user's window navigation is bound in the root table:
+For each axis, if the user has **not** set the corresponding `@livepicker-*`
+option explicitly, discover the keys from `tmux list-keys -T root` and
+`tmux list-keys -T prefix`:
 
-- Next window: `C-M-Tab` (`bind-key -n C-M-Tab swap-window -t +1 \; select-window -t +1`)
-- Previous window: `C-M-BTab`
+- **Window axis** — a key is a *next-window* key if its command contains any of:
+  `select-window -n`, `select-window -t +1`, `select-window -t :+1`,
+  `next-window` (and `next-window -a`), or the `swap-window … \;
+  select-window -t +1` compound; symmetrically for *prev-window* (`-p`,
+  `-t -1`, `:-1`, `previous-window`). Matching on the `select-window`/
+  `next-window` portion catches the user's `swap-window \; select-window`
+  compounds automatically.
+- **Session axis** — a key is a *next-session* key if its command is
+  `switch-client -n`; *prev-session* if `switch-client -p`. (Do **not** treat
+  `-l` (toggle) or `-t <name>` as axis keys.) Always add the arrow keys `Down`
+  (next-session) and `Up` (prev-session) as universal extras.
 
-So the defaults for the session-nav keys match those, so the feature works out
-of the box for this config:
+Then, for either axis:
 
-- `@livepicker-next-key` default `C-M-Tab`
-- `@livepicker-prev-key` default `C-M-BTab`
+- Collect every matching key from both tables.
+- **Drop any plain `a`-`z` / `A`-`Z` / `0`-`9`** (e.g. the user's prefix-table
+  `n` and `p`, and the digit `select-window -t :=N` bindings) — those stay
+  reserved for typing. Keep all control/meta/arrow/function keys (e.g. `C-n`,
+  `C-p`, `C-l`, `C-h`, `M-n`, `M-p`, `C-M-Tab`, `C-M-BTab`).
+- De-duplicate. Exclude any key that is one of the fixed control keys
+  (confirm/cancel/backspace/rename/delete) so discovery never shadows them.
+- Explicit `@livepicker-*-keys` options, when set, **override** discovery for
+  that axis (discovery is only the default-resolution path).
+
+**Worked example (this user).** Discovered window axis — next: `C-M-Tab`,
+`M-n`, `C-n`, `C-l`; prev: `C-M-BTab`, `M-p`, `C-p`, `C-h` (plain `n`/`p` and
+digits dropped). Discovered session axis — next: `)`, `Down`; prev: `(`, `Up`.
+So out of the box the user flips a session's windows with their familiar
+`Ctrl-M-Tab` / `Ctrl-M-Shift-Tab` (and `M-n`/`M-p`/`C-n`/`C-p`), and moves
+sessions with `)` / `(` or the arrows.
 
 ### Binding
 
-On activate, bind in the `livepicker` table, in this order:
+On activate, bind in the `livepicker` table, in this order (tmux keeps the
+**last** binding for a key, so each step overrides the ones before it):
 
 1. A copy of the user's current prefix and root bindings (read
    `tmux list-keys -T prefix` and `tmux list-keys -T root`, rewrite each line's
@@ -430,56 +610,42 @@ On activate, bind in the `livepicker` table, in this order:
    working during the picker.
 2. Typing: every `a`-`z`, `A`-`Z`, `0`-`9`, and `-_. /` →
    `input-handler.sh type <c>`.
-3. Confirm (`@livepicker-confirm-keys`, default `Enter`), cancel
-   (`@livepicker-cancel-keys`, default `Escape`), and backspace
+3. Window axis: each discovered (or explicit) next-window key →
+   `next-window`; each prev-window key → `prev-window`.
+4. Session axis: each discovered (or explicit) next-session key →
+   `next-session`; each prev-session key → `prev-session`.
+5. Confirm (`@livepicker-confirm-keys`, default `Enter`), cancel
+   (`@livepicker-cancel-keys`, default `Escape`), backspace
    (`@livepicker-backspace-keys`, default `BSpace`).
-4. Navigation: `@livepicker-next-key` + `@livepicker-nav-next-keys` (defaults
-   `C-M-Tab`, `Down`) → `next-session`; `@livepicker-prev-key` +
-   `@livepicker-nav-prev-keys` (defaults `C-M-BTab`, `Up`) → `prev-session`:
+6. Session management (section 21): `@livepicker-rename-key` (default `C-r`) →
+   `rename`; `@livepicker-delete-key` (default `M-BSpace`) → `delete`.
 
 ```
-tmux bind-key -T livepicker "$NEXT_KEY" run-shell "$SCRIPT_DIR/input-handler.sh next-session"
-tmux bind-key -T livepicker "$PREV_KEY" run-shell "$SCRIPT_DIR/input-handler.sh prev-session"
+tmux bind-key -T livepicker "$W_NEXT" run-shell "$SCRIPT_DIR/input-handler.sh next-window"
+tmux bind-key -T livepicker "$S_NEXT" run-shell "$SCRIPT_DIR/input-handler.sh next-session"
+tmux bind-key -T livepicker "$CONFIRM" run-shell "$SCRIPT_DIR/input-handler.sh confirm"
 ```
 
-5. Session management (section 21): `@livepicker-rename-key` (default `C-r`) →
-   `rename`; `@livepicker-delete-key` (default `M-BSpace`) → `delete`:
-
-```
-tmux bind-key -T livepicker "$RENAME_KEY" run-shell "$SCRIPT_DIR/input-handler.sh rename"
-tmux bind-key -T livepicker "$DELETE_KEY" run-shell "$SCRIPT_DIR/input-handler.sh delete"
-```
-
-Load-bearing ordering: tmux keeps the **last** binding for a key in a table, and
-steps 4 and 5 run after step 2. Any navigation/confirm/cancel/backspace/
-rename/delete key therefore **overrides** a typing binding for the same key —
-which is why those keys must be non-alphanumeric (control keys like `C-r` and
-`M-BSpace` are fine: they are distinct tmux keys from the letters `r` and
-backspace). An earlier default of `j`/`k` for next/prev left `j` and `k`
-silently untypeable: they were bound to `next-session`/`prev-session`, not
-`type j`/`type k`, so a query could never contain them. Reserving the full
-`a`-`z`, `A`-`Z`, `0`-`9` range for typing (navigating only with the arrows and
-the repurposed window-nav keys, managing with `C-r`/`M-BSpace`) removes that
-shadow. Vim-style `j`/`k` navigation is still available by setting
-`@livepicker-nav-next-keys`/ `@livepicker-nav-prev-keys` to include `j`/`k`,
-accepting that those two letters are then not typeable.
-
-### Discovery (optional convenience)
-
-A user with different bindings can set `@livepicker-next-key` and
-`@livepicker-prev-key` explicitly. As a convenience, if those are unset the
-plugin may attempt to discover window-nav keys by parsing `tmux list-keys` for
-`next-window`, `previous-window`, and `select-window -t :+` or `:-` patterns.
-Discovery is best-effort and must not override explicit options. (It would not
-find this user's `swap-window \; select-window` compound binding, which is why
-the defaults above are hardcoded to their keys.)
+**Load-bearing ordering and the typing reservation.** Steps 3–6 run after step
+2, so any nav/confirm/cancel/backspace/rename/delete key overrides the typing
+binding for the same key. That is safe only because every key bound in steps 3–6
+is **non-alphanumeric** (control/meta/arrow keys are distinct tmux keys from the
+letters). Discovery enforces this by dropping plain letters/digits; a plain
+letter or digit used for navigation would be silently untypeable. If a user
+genuinely wants vim-style `j`/`k` session-nav, they may set
+`@livepicker-session-next-keys` / `-prev-keys` to include `j`/`k`, accepting
+that those two letters then cannot be typed into a query.
 
 ## 9. State saved and restored
 
 On activate, save (all into `@livepicker-orig-*`):
 
 - Current session name and window id.
-- Current `window_layout` of the active window (for exact pane restore).
+- Current `window_layout` of the active window, **plus a pane-geometry snapshot**
+  of that window (`#{pane_id}`/`#{pane_left}`/`#{pane_top}`/`#{pane_width}`/
+  `#{pane_height}` per pane). The layout string is for restore; the geometry
+  snapshot is so restore can detect whether anything drifted and act only if it
+  did (Invariant C; section 23).
 - Current `key-table`.
 - Current `status` value (line count) and every set `status-format[n]`.
 - Current `renumber-windows` value.
@@ -488,20 +654,43 @@ On activate, save (all into `@livepicker-orig-*`):
 - Current `window-size` of the driver session (frozen to `manual` in clip mode;
   section 22).
 
+**Not saved, because never changed:** no candidate session's active window or
+layout is captured. The preview mechanism (section 7) never mutates a candidate,
+so there is nothing to restore for them (Invariant B). The only session whose
+state can shift while browsing is the driver itself (self-session window-flips,
+status grow) — that is what the items above cover.
+
+Runtime state (not saved, live in `@livepicker-*`, cleared on exit):
+`@livepicker-index`, `@livepicker-scroll`, `@livepicker-client-width`, plus the
+new window-cursor keys `@livepicker-cand-win-session` (the candidate the cached
+list belongs to), `@livepicker-cand-win-list` (that candidate's ordered window
+ids), `@livepicker-cand-win-cursor` (index into it; defaults to the candidate's
+active window on entry), and `@livepicker-preview-win-id` (the window currently
+shown).
+
 On restore (`restore.sh`), in order:
 
-1. Unlink the preview window from the current session if `@livepicker-linked-id`
-   is set.
-2. `select-window -t "$ORIG_WINDOW"`.
+1. Unlink the preview window from **`ORIG_SESSION`** (not the client's current
+   session — on a confirm/keep the client has already switched to the target) if
+   `@livepicker-linked-id` is set.
+2. `select-window -t "$ORIG_WINDOW"` (cancel only; `keep` skips this so the
+   client stays on the chosen `(S, W)`).
 3. If cancel: `switch-client -t "$ORIG_SESSION"` (return to the original
    session). If keep: do not switch (stay on the chosen target).
 4. Restore `status`, every `status-format[n]`, `renumber-windows`, `key-table`,
    the `session-window-changed` hook, the `client-resized` hook, and the driver's
    `window-size` (section 22).
-5. `select-layout "$ORIG_LAYOUT"` for the original window.
-6. Clear every `@livepicker-*` option (this MUST include the new runtime keys
-   `@livepicker-scroll` and `@livepicker-client-width` — add them to
-   `_STATE_RUNTIME_KEYS` in `state.sh`) and unbind the `livepicker` table.
+5. **Original-window pane restore (Invariant C, section 23):** compare the
+   original window's current pane geometry to the activation snapshot. If it is
+   unchanged, do nothing (the common case — leave it alone rather than risk
+   moving panes). Only if it drifted: restore the window's exact size first, then
+   `select-layout "$ORIG_LAYOUT"`. `select-layout` is size-dependent and can
+   itself move panes, so it is a last resort, never routine.
+6. Clear every `@livepicker-*` option (this MUST include the runtime keys
+   `@livepicker-scroll`, `@livepicker-client-width`, and the window-cursor keys
+   `@livepicker-cand-win-session`/`-list`/`-cursor`/`@livepicker-preview-win-id`
+   — add them to `_STATE_RUNTIME_KEYS` in `state.sh`) and unbind the
+   `livepicker` table.
 
 ## 10. Status-line setup
 
@@ -550,10 +739,10 @@ All options use the `@livepicker-` prefix.
 | `@livepicker-type`                 | `session`  | `session` or `window`. What the picker lists.                                                            |
 | `@livepicker-create`               | `on`       | In session mode, create a new session from the query on Enter when nothing matches.                      |
 | `@livepicker-zoxide-mode`          | `off`      | In session mode, when creating on Enter, resolve the query through `zoxide` and start the session there (mirrors `@sessionx-zoxide-mode`); falls back to a plain create if zoxide has no match. |
-| `@livepicker-next-key`             | `C-M-Tab`  | Key that moves to the next session. Defaults to this user's next-window key.                             |
-| `@livepicker-prev-key`             | `C-M-BTab` | Key that moves to the previous session. Defaults to this user's prev-window key.                         |
-| `@livepicker-nav-next-keys`        | `Down`     | Extra next-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
-| `@livepicker-nav-prev-keys`        | `Up`       | Extra previous-session keys. Must be non-alphanumeric; a letter/digit here is intercepted and not typeable. |
+| `@livepicker-session-next-keys`    | (discovered) | Next-session keys (session axis). Default: discovered `switch-client -n` bindings + `Down`. For this user: `)`, `Down`. Must be non-alphanumeric; a plain letter/digit is intercepted and not typeable. Section 8. |
+| `@livepicker-session-prev-keys`    | (discovered) | Previous-session keys (session axis). Default: discovered `switch-client -p` bindings + `Up`. For this user: `(`, `Up`. Must be non-alphanumeric. Section 8. |
+| `@livepicker-window-next-keys`     | (discovered) | Next-window keys (window axis — flip the previewed session's windows). Default: discovered next-window bindings. For this user: `C-M-Tab`, `M-n`, `C-n`, `C-l`. Must be non-alphanumeric. Section 8. |
+| `@livepicker-window-prev-keys`     | (discovered) | Previous-window keys (window axis). Default: discovered prev-window bindings. For this user: `C-M-BTab`, `M-p`, `C-p`, `C-h`. Must be non-alphanumeric. Section 8. |
 | `@livepicker-confirm-keys`         | `Enter`    | Confirm and land on the selection.                                                                       |
 | `@livepicker-cancel-keys`          | `Escape`   | Clear the query, or cancel if the query is empty.                                                        |
 | `@livepicker-backspace-keys`       | `BSpace`   | Remove the last filter character.                                                                        |
@@ -586,8 +775,8 @@ tmux-livepicker/
     utils.sh                  safe tmux option helpers (get/set/unset/save)
     state.sh                  @livepicker-* state get/set/clear
     livepicker.sh             activate: save, build list, install status, bind keys, first preview
-    input-handler.sh          type / backspace / next-session / prev-session / confirm / cancel / rename / delete
-    preview.sh                link-window live preview (with capture fallback)
+    input-handler.sh          type / backspace / next-session / prev-session / next-window / prev-window / confirm / cancel / rename / delete
+    preview.sh                link-window live preview of the candidate's chosen window into the driver (with capture fallback); never mutates the candidate (Invariant B/C)
     renderer.sh               status-line #() renderer: query bar + ranked tabs in a scroll viewport + overflow indicators
     rank.sh                   sourced lib: lp_rank fuzzy subsequence match + score (section 20)
     layout.sh                 sourced lib: lp_viewport tab-width measurement + scroll-into-view math (section 19)
@@ -601,11 +790,14 @@ The commands the plugin relies on:
 
 - `list-sessions -F '#{session_name}'` to build the list.
 - `list-windows -t "=$S" -F '#{window_id}' -f '#{window_active}'` to find a
-  session's active window id.
-- `link-window -a -s <id> -t <session>:` to link a window into the current
-  session.
-- `unlink-window -t <session>:<id>` to remove the linked preview window.
-- `select-window -t <id>` to show the linked window.
+  session's active window id; `list-windows -t "=$S" -F '#{window_id}'` (no
+  `-f`) for the ordered full list the window-flip axis walks.
+- `link-window -s <id> -t <driver>:` to link the chosen window into the driver
+  (bare, no `-a`; the driver is `ORIG_SESSION`, never the candidate).
+- `unlink-window -t <driver>:<id>` to remove the linked preview window from the
+  driver only (the candidate keeps its window).
+- `select-window -t <id>` to show the linked window **in the driver** (never on
+  the candidate while browsing).
 - `capture-pane -ep -t "=$S"` for the snapshot fallback.
 - `switch-client -t "=S"` for the single confirm-time session switch.
 - `set-option -g status <n>`, `status-format[n]`, `key-table`,
@@ -628,15 +820,27 @@ The commands the plugin relies on:
 
 The invariant from section 4, proven:
 
-- **Browsing:** `link-window` and `select-window` operate inside the current
-  session. `client-session-changed` does not fire. The `tmux-session-history`
-  timeline and `@session-history-prev` pointer are unchanged. Zero entries added.
+- **Browsing — Invariant A (no client switch):** `link-window` and
+  `select-window` operate inside the driver. `client-session-changed` does not
+  fire. The `tmux-session-history` timeline and `@session-history-prev` pointer
+  are unchanged. Zero entries added.
+- **Browsing — Invariant B (no candidate mutation):** window-flips link the
+  chosen window into the driver and select it there; no command targets the
+  candidate session, so the candidate's active window and `window_layout` are
+  byte-identical before and after browsing it. Verified by capturing
+  `#{window_active}` + `#{window_layout}` of a candidate before preview and
+  asserting equality after navigating away.
+- **Browsing — Invariant C (pane immutability):** no pane of any session is
+  moved or resized. The driver is pinned (`window-size manual` + height pin) so
+  the status grow and the shared preview window cannot reflow. Verified by a
+  pane-geometry snapshot diff across a full browse cycle (section 15/23).
 - **Confirm:** exactly one `switch-client`. The history engine treats it as one
   navigation (forward history collapses, the new session appends at the tip),
   the same way it already treats a tmux-sessionx jump. This is correct,
   browser-like behavior.
-- **Cancel:** zero `switch-client` to a different session. History and toggle are
-  exactly as before activation.
+- **Cancel:** zero `switch-client` to a different session. History and toggle
+  are exactly as before activation. Every non-self candidate is already pristine
+  (Invariant B); the driver's window and pane geometry are restored (Invariant C).
 - **Toggle after confirm:** `prefix L` returns to the session that was active
   before the pick, because only one switch occurred.
 - **`session-window-changed`:** fires during preview navigation. Suppressed by
@@ -656,9 +860,13 @@ server is untouched).
 - Activation grows the status bar to two lines; line 1 shows the picker; the area
   below shows the current session's panes live.
 - Typing filters the list and updates the highlight.
-- `C-M-Tab` / `C-M-BTab` move the session selection; the preview follows live.
-- Enter on a match closes the picker and lands on the session.
-- Escape closes the picker and returns to the original session and window.
+- `)` / `Down` (session axis) move the session selection; the preview follows
+  live. `C-M-Tab` / `C-M-BTab` (window axis) flip the previewed session's
+  windows; line 2's window-status follows the flip.
+- Enter on a match closes the picker and lands on the chosen session **and the
+  window being previewed**.
+- Escape closes the picker and returns to the original session and window; every
+  session that was previewed is back on its original window.
 
 ### Pollution (the core invariant)
 
@@ -672,20 +880,55 @@ With `tmux-session-history` installed:
 
 - A candidate session with a multi-pane window shows all panes in their real
   layout, live, while highlighted.
-- Navigating away unlinks the preview; the candidate's window is intact in its
-  own session (verified by `list-windows -t` before and after).
+- Flipping its windows (window axis) re-links each chosen window; each shows all
+  its panes live. The candidate's own active window is unchanged (Invariant B).
+- Navigating away unlinks the driver's preview; the candidate's window is intact
+  in its own session, on its original active window (verified by `list-windows
+  -t` + `#{window_active}` before and after).
 - Self-session highlight shows the user's own session without linking.
 - Clip sizing (`@livepicker-preview-fit clip`): on activation the status grows
   to two lines but the preview's panes do **not** reflow — its bottom row is
-  clipped; navigating between candidates re-links without per-nav reflow. After
-  exit, the driver's `window-size` is restored and the panes return to their
-  natural size. (If empirical testing shows tmux force-resizes instead of
-  clipping, `reflow` is the documented fallback.)
+  clipped; navigating between candidates and flipping windows re-links without
+  per-action reflow. After exit, the driver's `window-size` is restored.
 
-### Key repurpose
+### Pane immutability (Invariant C — load-bearing)
 
-- During the picker, `C-M-Tab` / `C-M-BTab` move sessions.
-- After the picker closes, the same keys move windows again.
+These MUST be verified with a **real attached client** (sessions created with
+`-x`/`-y` are size-locked and will not reproduce the shared-window resize); use
+the isolated-socket harness with a real client, and restore the user's live
+state afterward.
+
+- **No candidate pane movement:** open the picker on a driver client; preview a
+  candidate whose active window has a multi-pane layout; capture its pane
+  geometry (`#{pane_left}`/`#{pane_top}`/`#{pane_width}`/`#{pane_height}` per
+  pane). Flip through several of its windows, move to other sessions, then
+  cancel. Assert the candidate's pane geometry is byte-identical to the
+  pre-pick snapshot.
+- **No status-grow reflow:** assert the candidate's pane geometry does not
+  change merely because the picker opened (status 1 -> 2).
+- **No confirm side-effects beyond the chosen window:** confirm on candidate `S`
+  window `W`. Assert `S`'s OTHER windows are unchanged, and that within `W` only
+  the active-window selection changed — pane geometry of `W`'s panes is
+  unchanged.
+- **Original window intact:** after a full browse -> cancel cycle, the driver's
+  original window pane geometry is byte-identical to the activation snapshot.
+- **Escape hatch:** if any of the above cannot be satisfied with `clip` on the
+  target tmux, `@livepicker-preview-fit reflow` or `@livepicker-preview-mode
+  snapshot` (never touches a live window) must hold the invariant. See section
+  23.
+
+### Key discovery / two-axis
+
+- Discovery resolves the window axis to this user's `C-M-Tab`/`M-n`/`C-n`/`C-l`
+  (next) and `C-M-BTab`/`M-p`/`C-p`/`C-h` (prev), and the session axis to
+  `)`/`Down` (next) and `(`/`Up` (prev); plain `n`/`p` and digits are NOT bound
+  (still typeable).
+- During the picker, the window-axis keys flip the previewed session's windows
+  and the session-axis keys move sessions.
+- After the picker closes, every one of those keys does exactly what it did
+  before (window-nav keys move/reorder windows; `(`/`)` switch sessions).
+- Setting `@livepicker-session-*-keys` / `@livepicker-window-*-keys` explicitly
+  overrides discovery for that axis.
 
 ### Restore
 
@@ -695,8 +938,10 @@ With `tmux-session-history` installed:
   restored.
 - No `@livepicker-*` options remain (`tmux show-options -g | grep livepicker`
   prints nothing).
-- The original window's pane layout is exact (`select-layout` to the saved
-  layout).
+- The original window's pane geometry is byte-identical to the activation
+  snapshot; `select-layout` ran only if drift was detected (section 23).
+- For every candidate previewed during the run, its active window id and
+  `window_layout` equal their pre-activation values (Invariant B).
 
 ### Create-on-enter
 
@@ -779,11 +1024,14 @@ With `tmux-session-history` installed:
   are dropped or passed to the previewed pane. If passed, bind common keys so no
   input leaks into the candidate session.
 - **Navigation keys must be non-alphanumeric.** In the modal `livepicker` table
-  the navigation/confirm/cancel/backspace binds run after the typing binds, so a
-  key in any of those lists overrides its typing binding. A plain letter or
+  the session/window/confirm/cancel/backspace binds run after the typing binds,
+  so a key in any of those lists overrides its typing binding. A plain letter or
   digit used for navigation is therefore silently untypeable. Keep those keys
-  non-alphanumeric (arrows, `C-M-Tab`/`C-M-BTab`, `Enter`, `Escape`, `BSpace`);
-  vim-style `j`/`k` is opt-in via `@livepicker-nav-*-keys`.
+  non-alphanumeric (arrows, `(`/`)`, `C-M-Tab`/`C-M-BTab`, `M-n`/`M-p`,
+  `C-n`/`C-p`/`C-l`/`C-h`, `Enter`, `Escape`, `BSpace`); discovery enforces this
+  by dropping plain letters/digits. Vim-style `j`/`k` is opt-in via
+  `@livepicker-session-*-keys`, accepting that those letters are then not
+  typeable.
 - **zoxide dependency.** `@livepicker-zoxide-mode` shells out to `zoxide query`.
   If `zoxide` is absent or returns no match, the create path falls back to a
   plain `new-session` (never `-c ""`). zoxide resolves only dirs it has indexed
@@ -829,17 +1077,35 @@ With `tmux-session-history` installed:
   target the invoking client, and restore must put back the exact prior hook;
   otherwise a detach/reattach or multi-client width mismatch leaves the viewport
   stale.
-- **Preview clip feasibility (load-bearing, section 22).** The no-jank clip
+- **Shared-window pane mutation (Invariant C, confirmed root cause, section 23).**
+  The preview is one shared window object across every session it is linked
+  into, so resizing it in the driver reflows its panes **in the candidate too**
+  — and the mutation is **permanent**: `unlink-window` does not roll it back
+  (verified), and `select-layout` restore is size-dependent and unreliable
+  (verified). Therefore the plugin must PREVENT any resize, never attempt to
+  repair it. Confirmed-safe operations (when the session is not auto-resizing):
+  `link-window`, `select-window`, `unlink-window`. Forbidden on any candidate /
+  original window during preview: `resize-window`, `resize-pane`,
+  `select-layout`, `swap-pane`, `swap-window`, `move-pane`, `move-window`,
+  `break-pane`, `join-pane`, `pipe-pane`, and geometry-affecting `setw`. The
+  §22 clip (driver `window-size manual` + height pin) is the prevention
+  mechanism but, as scoped today, pins only the driver's activation-time
+  window — candidate windows linked later are NOT covered and must be verified.
+- **Preview clip feasibility (load-bearing, section 22/23).** The no-reflow clip
   relies on tmux showing an oversized `window-size manual` window **clipped**
   rather than force-resizing it, for a window that is **shared with its source
   session**. This is subtle and version-dependent: the single shared size is
   influenced by every session/client the window is linked into, so a smaller
-  client on the source could still drag the size down. Verify on 3.6b that (a) a
-  manual session clips an oversized active window at the bottom, (b)
-  `window-size -t` isolates to the driver (else save/restore globally), and (c)
-  a linked-from-elsewhere window clips in the driver without disturbing the
-  source. If any fails, fall back to `@livepicker-preview-fit reflow` or
-  `@livepicker-preview-mode snapshot`.
+  client on the source could still drag the size down. This could NOT be fully
+  verified without a real multi-client setup, so the implementer MUST confirm on
+  3.6b with a real client that (a) a manual session clips an oversized active
+  window at the bottom, (b) `window-size -t` isolates to the driver (else
+  save/restore globally), (c) a linked-from-elsewhere window clips in the driver
+  without disturbing the source's panes, and (d) flipping a candidate's windows
+  never resizes them. If any fails, fall back to freezing each candidate's
+  `window-size`+size at link time (restore on unlink), or to
+  `@livepicker-preview-fit reflow`, or to `@livepicker-preview-mode snapshot`
+  (which never touches a live window). Section 23 owns the full regime.
 - **Live Testing** Testing must _always_ be performed in an isolated tmux session
   to avoid conflicting with the user's live, running instance. When a final real
   -world test must be performed, it is critical to ensure that the user's
@@ -975,6 +1241,14 @@ bringing the redraw back under budget (~60 ms on a ~15-session list, A/B vs ~200
 - Because the preview is no longer synchronous, the `session-window-changed`
   suppression (section 7) still applies, but the *rate* of hook fires is
   naturally bounded by debounce, easing that concern.
+- **Window-axis flips defer the same way.** `next-window`/`prev-window` advance
+  the window cursor and schedule a supersedeable re-link exactly like a
+  session-nav preview; they never block the next keypress. A flip does not
+  change line 1 (the session tabs are unchanged), so it issues only a
+  `refresh-client -S` so line 2's window-status follows the newly active window
+  — cheaper than a session move. Because flips only link into the driver and
+  never touch the candidate, a stale superseded flip can never mutate a
+  candidate's panes (Invariant B/C holds regardless of debounce timing).
 
 **Control.** `@livepicker-preview-defer` (default `on`) toggles this behavior;
 `off` restores the legacy synchronous-preview path (useful for comparison or
@@ -1303,3 +1577,85 @@ linked into. The implementer MUST empirically confirm on tmux 3.6b (mirror the
 If any of these fail, fall back to `@livepicker-preview-fit reflow`, or to
 `@livepicker-preview-mode snapshot` (section 7), which never resizes a live
 window at all.
+
+## 23. Pane immutability — zero mutation of any session's panes
+
+**Requirement (Invariant C, absolute).** Browsing, confirming, or cancelling
+must not move, resize, reorder, reset, or otherwise alter any property of any
+pane in any session — not the candidate being previewed, not the driver/original
+window, not any bystander session. "I selected a session and some of its panes
+resized / swapped places" is a bug this section exists to eliminate.
+
+**Root cause (confirmed empirically in isolation).** The preview is a *shared*
+tmux window object (section 7): a window linked into multiple sessions has ONE
+size and ONE pane set. Resizing it in any session reflows its panes in ALL of
+them. Three findings drive the design:
+
+1. Resizing a shared window moves panes in every session it is linked into
+   (reproduced: a candidate's panes changed geometry when the shared window was
+   resized from the driver).
+2. `window-size manual` blocks *automatic* resize-to-client, but does **not**
+   block an explicit `resize-window`, and does not by itself guarantee a shared
+   window is immune when other sessions/clients act on it.
+3. The mutation is **permanent** — `unlink-window` does not roll it back
+   (reproduced), and `select-layout` restore is size-dependent and failed to
+   restore geometry in testing. **There is no reliable after-the-fact repair.**
+
+**Therefore: prevent, never repair.** The plugin must never cause the
+candidate's or original's window to be resized or its panes mutated.
+
+**Confirmed-safe operations** (verified not to resize when the session is not
+auto-resizing to a mismatched client): `link-window`, `select-window`,
+`unlink-window`. The entire preview / flip / confirm-cancel mechanism is built
+from these plus the driver's `window-size` pin.
+
+**Forbidden during preview** (on any candidate or original window or its
+panes): `resize-window`, `resize-pane`, `select-layout`, `swap-pane`,
+`swap-window`, `move-pane`, `move-window`, `break-pane`, `join-pane`,
+`pipe-pane`, and any `set-window-option`/`setw` that affects pane geometry —
+*except* the one activation-time driver height pin in section 22, which is
+scoped to the driver's own pre-grow window and must be verified not to perturb
+candidates.
+
+**Prevention regime.** The section 22 clip is necessary but, as scoped today,
+insufficient: it pins the driver's `window-size` and the driver's
+activation-time window height, but candidate windows linked in later are not
+pinned, and the restore-time `select-layout` can itself move panes. The
+implementer must close both gaps. The spec is deliberately non-prescriptive
+about the exact command sequence (the cross-session shared-window behavior is
+version/client-dependent and could not be fully verified here); the
+requirements are:
+
+- The driver must be pinned (`window-size manual` + height pin) before the
+  status grows, so the status grow never reflows the shared preview window.
+- Candidate windows linked in later must be protected just as well. If the
+  driver pin alone does not guarantee that on the target tmux (verify with a
+  real client), freeze each candidate at link time too: set the candidate's
+  `window-size` to `manual` and pin its window to its captured geometry, and
+  restore the candidate's prior `window-size` on unlink. (A candidate's own
+  attached clients should be unaffected by a manual pin that merely prevents
+  auto-resize; verify.)
+- Restore-time `select-layout` (section 9 step 5) must be a **no-op whenever
+  the original window did not actually drift** (compare the pane-geometry
+  snapshot captured at activation). Only if drift is detected: restore the
+  window's exact size first, then `select-layout`. Leaving the window untouched
+  is always preferable to moving its panes.
+- If live linking cannot meet the invariant on a given setup, degrade to
+  `@livepicker-preview-mode snapshot`, which renders `capture-pane` output and
+  never touches a live window — the invariant then holds trivially.
+
+**Verification (load-bearing, requires a real client).** Reproduce with a real
+attached client (sessions created with `new-session -x -y` are size-locked and
+hide the bug). Use the isolated-socket harness, and restore the user's live
+state afterward. Assert, across open -> flip several windows -> move sessions ->
+cancel, and across open -> flip -> confirm:
+
+- Each candidate's pane geometry is byte-identical before and after.
+- The original/driver window's pane geometry is byte-identical after cancel.
+- On confirm, only the chosen window becomes active in the target session; no
+  pane anywhere is resized.
+
+**Control.** This invariant is always on; it is not optional.
+`@livepicker-preview-fit clip` (section 22) is the primary mechanism; `reflow`
+and `snapshot` are escape hatches if `clip` cannot meet the invariant on a
+given tmux/terminal.
